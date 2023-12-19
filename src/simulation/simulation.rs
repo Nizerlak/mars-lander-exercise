@@ -4,8 +4,10 @@ mod simulation {
     const ANGLE_STEP: f64 = 15.;
     const POWER_STEP: i32 = 1;
     const DT: f64 = 1.;
+    const MAP_WIDTH: u32 = 7000;
+    const MAP_HEIGHT: u32 = 3000;
 
-    #[derive(Clone)]
+    #[derive(Clone, Debug)]
     pub struct Thrust {
         angle: f64,
         power: i32,
@@ -27,7 +29,7 @@ mod simulation {
         }
     }
 
-    #[derive(Clone)]
+    #[derive(Clone, Debug)]
     pub struct LanderState {
         x: f64,
         y: f64,
@@ -37,16 +39,31 @@ mod simulation {
         thrust: Thrust,
     }
 
+    impl LanderState {
+        pub fn initial(x: f64, y: f64, vx: f64, vy: f64, fuel: f64) -> Self {
+            Self {
+                x,
+                y,
+                vx,
+                vy,
+                fuel,
+                thrust: Thrust::zero(),
+            }
+        }
+    }
+
     pub struct LandPoint {
         x: u32,
         y: u32,
     }
 
+    #[derive(Debug)]
     struct Land {
         x: Vec<u32>,
         y: Vec<u32>,
     }
 
+    #[derive(Debug)]
     pub struct Simulation {
         land: Land,
         lander: LanderState,
@@ -105,8 +122,8 @@ mod simulation {
                     angle: current_angle,
                 } = lander.thrust;
                 let (e_power, e_angle) = (
-                    clamp(current_power - cmd.power, -POWER_STEP, POWER_STEP),
-                    clamp(current_angle - cmd.angle, -ANGLE_STEP, ANGLE_STEP),
+                    clamp(cmd.power - current_power, -POWER_STEP, POWER_STEP),
+                    clamp(cmd.angle - current_angle, -ANGLE_STEP, ANGLE_STEP),
                 );
                 lander.thrust.power += e_power;
                 lander.thrust.angle += e_angle;
@@ -130,5 +147,35 @@ mod simulation {
         } else {
             value
         }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        // Note this useful idiom: importing names from outer (for mod tests) scope.
+        use super::*;
+
+        fn flat_ground() -> impl Iterator<Item = LandPoint> {
+            [0, MAP_WIDTH].into_iter().map(|x| LandPoint { x, y: 0 })
+        }
+        fn default_sim() -> Simulation {
+            Simulation::new(
+                flat_ground(),
+                LanderState::initial(500., 500., 0., 0., 200.),
+            )
+        }
+
+        #[test]
+        fn clamping_test() {
+            let mut sim = default_sim();
+            sim.iterate(Thrust {
+                angle: 16.,
+                power: 2,
+            })
+            .unwrap();
+            let state = sim.current_state();
+            assert_eq!(state.thrust.angle, 15.);
+            assert_eq!(state.thrust.power, 1);
+        }
+
     }
 }

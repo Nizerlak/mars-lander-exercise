@@ -13,9 +13,15 @@ mod simulation {
         power: i32,
     }
 
+    impl Default for Thrust {
+        fn default() -> Self {
+            Self::zero()
+        }
+    }
+
     impl Thrust {
         fn into_vector(self) -> (f64, f64) {
-            let angle = self.angle.to_radians();
+            let angle = (self.angle + 90.).to_radians();
             let (sin, cos) = angle.sin_cos();
             let power = self.power as f64;
             (cos * power, sin * power)
@@ -29,26 +35,39 @@ mod simulation {
         }
     }
 
-    #[derive(Clone, Debug)]
+    #[derive(Clone, Debug, Default)]
     pub struct LanderState {
-        x: f64,
-        y: f64,
-        vx: f64,
-        vy: f64,
-        fuel: f64,
-        thrust: Thrust,
+        pub x: f64,
+        pub y: f64,
+        pub vx: f64,
+        pub vy: f64,
+        pub fuel: i32,
+        pub thrust: Thrust,
     }
 
     impl LanderState {
-        pub fn initial(x: f64, y: f64, vx: f64, vy: f64, fuel: f64) -> Self {
-            Self {
-                x,
-                y,
-                vx,
-                vy,
-                fuel,
-                thrust: Thrust::zero(),
-            }
+        pub fn with_x(self, x: f64) -> Self {
+            Self { x, ..self }
+        }
+
+        pub fn with_y(self, y: f64) -> Self {
+            Self { y, ..self }
+        }
+
+        pub fn with_vx(self, vx: f64) -> Self {
+            Self { vx, ..self }
+        }
+
+        pub fn with_vy(self, vy: f64) -> Self {
+            Self { vy, ..self }
+        }
+
+        pub fn with_fuel(self, fuel: i32) -> Self {
+            Self { fuel, ..self }
+        }
+
+        pub fn with_thrust(self, thrust: Thrust) -> Self {
+            Self { thrust, ..self }
         }
     }
 
@@ -67,6 +86,11 @@ mod simulation {
     pub struct Simulation {
         land: Land,
         lander: LanderState,
+    }
+
+    #[derive(Debug)]
+    pub enum SimulationError {
+        InvalidThrust(Thrust),
     }
 
     impl Simulation {
@@ -93,30 +117,16 @@ mod simulation {
             self.lander.clone()
         }
 
-        pub fn iterate(&mut self, cmd: Thrust) -> Result<(), Thrust> {
+        pub fn iterate(&mut self, cmd: Thrust) -> Result<(), SimulationError> {
             // validate cmd
             if !validate_thrust(&cmd) {
-                return Err(cmd);
+                return Err(SimulationError::InvalidThrust(cmd));
             }
 
-            // update position
             let lander = &mut self.lander;
-            lander.x += lander.vx * DT;
-            lander.y += lander.vy * DT;
-
-            // update velocity
-            let (t_x, t_y) = lander.thrust.clone().into_vector();
-            lander.vx += t_x * DT;
-            lander.vy += (t_y - G) * DT;
-
-            // consume fuel
-            lander.fuel -= lander.thrust.power as f64;
-            if lander.fuel < 0. {
-                lander.fuel = 0.;
-            }
 
             // update thrust
-            if lander.fuel > 0. {
+            if lander.fuel > cmd.power {
                 let Thrust {
                     power: current_power,
                     angle: current_angle,
@@ -129,6 +139,23 @@ mod simulation {
                 lander.thrust.angle += e_angle;
             } else {
                 lander.thrust = Thrust::zero();
+            }
+
+            // vectorize thrust
+            let (t_x, t_y) = lander.thrust.clone().into_vector();
+
+            // update position
+            lander.x += lander.vx * DT + t_x / 2. * DT.powf(2.);
+            lander.y += lander.vy * DT + (t_y - G) / 2. * DT.powf(2.);
+
+            // update velocity
+            lander.vx += t_x * DT;
+            lander.vy += (t_y - G) * DT;
+
+            // consume fuel
+            lander.fuel -= lander.thrust.power;
+            if lander.fuel < 0 {
+                lander.fuel = 0;
             }
             Ok(())
         }
@@ -154,19 +181,34 @@ mod simulation {
         // Note this useful idiom: importing names from outer (for mod tests) scope.
         use super::*;
 
+        fn assert_feq(left: f64, right: f64) {
+            if (left - right).abs() > 1e-9 {
+                panic!("Float equal assertion failed, {left} != {right}");
+            }
+        }
+
+        fn assert_close(left: f64, right: f64, range: f64) {
+            if (left - right).abs() > range {
+                panic!("Assertion failed {left} not close to {right} within a range {range}");
+            }
+        }
+
         fn flat_ground() -> impl Iterator<Item = LandPoint> {
             [0, MAP_WIDTH].into_iter().map(|x| LandPoint { x, y: 0 })
         }
-        fn default_sim() -> Simulation {
-            Simulation::new(
-                flat_ground(),
-                LanderState::initial(500., 500., 0., 0., 200.),
-            )
+
+        fn sim_with_flat_ground(initial_lander: LanderState) -> Simulation {
+            Simulation::new(flat_ground(), initial_lander)
         }
 
         #[test]
-        fn clamping_test() {
-            let mut sim = default_sim();
+        fn clamping() {
+            let mut sim = sim_with_flat_ground(
+                LanderState::default()
+                    .with_y(500.)
+                    .with_x(500.)
+                    .with_fuel(200),
+            );
             sim.iterate(Thrust {
                 angle: 16.,
                 power: 2,
@@ -177,5 +219,58 @@ mod simulation {
             assert_eq!(state.thrust.power, 1);
         }
 
+        #[test]
+        fn free_fall() {
+            let mut sim = sim_with_flat_ground(LanderState::default().with_y(500.));
+            let initial_x = sim.current_state().x;
+            sim.iterate(Thrust::zero()).unwrap();
+            let state = sim.current_state();
+            assert_feq(state.x, initial_x);
+            assert_close(state.y, 498., 0.15);
+        }
+
+        #[test]
+        fn thrust_up() {
+            let mut sim = sim_with_flat_ground(LanderState::default().with_y(500.).with_fuel(100));
+            let initial_x = sim.current_state().x;
+            sim.iterate(Thrust {
+                angle: 0.,
+                power: 4,
+            })
+            .unwrap();
+            let state = sim.current_state();
+            assert_feq(state.x, initial_x);
+            assert_close(state.y, 498.5, 0.15);
+        }
+
+        #[test]
+        fn fly_up() {
+            let mut sim = sim_with_flat_ground(LanderState::default().with_y(500.).with_fuel(500));
+            let initial_x = sim.current_state().x;
+            let initial_y = sim.current_state().y;
+            for _ in 0..41 {
+                sim.iterate(Thrust {
+                    angle: 0.,
+                    power: 4,
+                })
+                .unwrap();
+            }
+            let state = sim.current_state();
+            assert!(state.y > initial_y);
+            assert_feq(state.x, initial_x);
+        }
+
+        #[test]
+        fn fuel_consumption() {
+            let mut sim = sim_with_flat_ground(LanderState::default().with_y(500.).with_fuel(200));
+            let iniitial_fuel = sim.current_state().fuel;
+            sim.iterate(Thrust {
+                angle: 0.,
+                power: 1,
+            })
+            .unwrap();
+            let state = sim.current_state();
+            assert_eq!(iniitial_fuel - state.fuel, 1);
+        }
     }
 }

@@ -72,14 +72,14 @@ mod simulation {
     }
 
     pub struct LandPoint {
-        x: u32,
-        y: u32,
+        x: f64,
+        y: f64,
     }
 
     #[derive(Debug)]
     struct Land {
-        x: Vec<u32>,
-        y: Vec<u32>,
+        x: Vec<f64>,
+        y: Vec<f64>,
     }
 
     #[derive(Debug)]
@@ -176,8 +176,98 @@ mod simulation {
         }
     }
 
+    #[derive(Clone, Copy)]
+    struct Vec2 {
+        x: f64,
+        y: f64,
+    }
+
+    impl Vec2 {
+        fn cross(self, w: Vec2) -> f64 {
+            self.x * w.y - self.y * w.x
+        }
+
+        fn dot(self, w: Vec2) -> f64 {
+            self.x * w.x + self.y + w.y
+        }
+
+        fn add(self, w: Vec2) -> Vec2 {
+            Vec2 {
+                x: self.x + w.x,
+                y: self.y + w.y,
+            }
+        }
+
+        fn subtract(self, w: Vec2) -> Vec2 {
+            Vec2 {
+                x: self.x - w.x,
+                y: self.y - w.y,
+            }
+        }
+
+        fn scale(self, k: f64) -> Vec2 {
+            Vec2 {
+                x: self.x * k,
+                y: self.y * k,
+            }
+        }
+    }
+
+    impl Into<Vec2> for LandPoint {
+        fn into(self) -> Vec2 {
+            Vec2 {
+                x: self.x,
+                y: self.y,
+            }
+        }
+    }
+
+    fn check_collision(
+        segment_a: (LandPoint, LandPoint),
+        segment_b: (LandPoint, LandPoint),
+    ) -> Option<(f64, f64)> {
+        // https://stackoverflow.com/questions/563198/how-do-you-detect-where-two-line-segments-intersect
+
+        let (p, p1): (Vec2, Vec2) = (segment_a.0.into(), segment_a.1.into());
+        let r = p1.subtract(p);
+
+        let (q, q1): (Vec2, Vec2) = (segment_b.0.into(), segment_b.1.into());
+        let s = q1.subtract(q);
+
+        let rs = r.cross(s);
+        let q_p = q.subtract(p);
+        let qpr = q_p.cross(r);
+
+        let t = q_p.cross(s) / rs;
+        let u = q_p.cross(r) / rs;
+
+        if rs == 0f64 && qpr == 0f64 {
+            // collinear
+            // check if overlapping
+            let rr = r.dot(r);
+            let t0 = q_p.dot(r) / rr;
+            let t1 = t0 + s.dot(r) / rr;
+            let (t0, t1) = if t0 < t1 { (t0, t1) } else { (t1, t0) };
+
+            if t0 > 1. || t1 < 0. {
+                // collinear, disjoint
+                None
+            } else {
+                Some((q.x, q.y))
+            }
+        } else if rs == 0f64 && qpr != 0f64 {
+            // parallel, not intersecting
+            None
+        } else if rs != 0f64 && t >= 0f64 && t <= 1f64 && u >= 0f64 && u <= 1f64 {
+            let Vec2 { x, y } = p.add(r.scale(t));
+            Some((x, y))
+        } else {
+            None
+        }
+    }
+
     #[cfg(test)]
-    mod tests {
+    mod physics_tests {
         // Note this useful idiom: importing names from outer (for mod tests) scope.
         use super::*;
 
@@ -194,7 +284,10 @@ mod simulation {
         }
 
         fn flat_ground() -> impl Iterator<Item = LandPoint> {
-            [0, MAP_WIDTH].into_iter().map(|x| LandPoint { x, y: 0 })
+            [0, MAP_WIDTH].into_iter().map(|x| LandPoint {
+                x: x as f64,
+                y: 0f64,
+            })
         }
 
         fn sim_with_flat_ground(initial_lander: LanderState) -> Simulation {
@@ -271,6 +364,78 @@ mod simulation {
             .unwrap();
             let state = sim.current_state();
             assert_eq!(iniitial_fuel - state.fuel, 1);
+        }
+    }
+
+    #[cfg(test)]
+    mod collision_tests {
+        use super::{check_collision, LandPoint};
+
+        fn check(
+            ((a00, a01), (a10, a11)): ((f64, f64), (f64, f64)),
+            ((b00, b01), (b10, b11)): ((f64, f64), (f64, f64)),
+        ) -> Option<(f64, f64)> {
+            check_collision(
+                (LandPoint { x: a00, y: a01 }, LandPoint { x: a10, y: a11 }),
+                (LandPoint { x: b00, y: b01 }, LandPoint { x: b10, y: b11 }),
+            )
+        }
+
+        #[test]
+        fn not_parallel_disjoint() {
+            assert!(check(((-1., -3.), (-5., -4.)), ((1., 1.), (5., 1.))).is_none());
+        }
+
+        #[test]
+        fn parallel_disjoint() {
+            assert!(check(((1., 3.), (6., 3.)), ((1., 1.), (5., 1.))).is_none());
+        }
+
+        #[test]
+        fn collinear_disjoint() {
+            assert!(check(((6., 1.), (7., 1.)), ((1., 1.), (5., 1.))).is_none());
+        }
+
+        #[test]
+        fn touching_not_parallel() {
+            let (x, y) = check(((1., 5.), (2., 2.)), ((0., 0.), (3., 3.))).unwrap();
+            assert_eq!(x, 2.);
+            assert_eq!(y, 2.);
+        }
+
+        #[test]
+        fn touching_not_parallel2() {
+            let (x, y) = check(((2., 2.), (1., 5.)), ((0., 0.), (3., 3.))).unwrap();
+            assert_eq!(x, 2.);
+            assert_eq!(y, 2.);
+        }
+
+        #[test]
+        fn crossing() {
+            let (x, y) = check(((2., 5.), (2., -2.)), ((0., 0.), (3., 3.))).unwrap();
+            assert_eq!(x, 2.);
+            assert_eq!(y, 2.);
+        }
+
+        #[test]
+        fn collinear_touching() {
+            let (x, y) = check(((-3., 1.), (1., 1.)), ((1., 1.), (3., 1.))).unwrap();
+            assert_eq!(x, 1.);
+            assert_eq!(y, 1.);
+        }
+
+        #[test]
+        fn collinear_overlaping() {
+            let (x, y) = check(((-2., 1.), (2., 1.)), ((1., 1.), (3., 1.))).unwrap();
+            assert_eq!(x, 1.);
+            assert_eq!(y, 1.);
+        }
+
+        #[test]
+        fn collinear_overlaping2() {
+            let (x, y) = check(((-2., 1.), (5., 1.)), ((1., 1.), (3., 1.))).unwrap();
+            assert_eq!(x, 1.);
+            assert_eq!(y, 1.);
         }
     }
 }

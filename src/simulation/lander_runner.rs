@@ -72,6 +72,10 @@ impl LanderRunner {
         }
     }
 
+    pub fn num_of_landers(&self) -> usize{
+        self.landers.len()
+    }
+
     pub fn current_states(&self) -> impl Iterator<Item = (&FlightState, &LanderHistory)> {
         self.states.iter().zip(&self.landers)
     }

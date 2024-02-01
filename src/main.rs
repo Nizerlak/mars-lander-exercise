@@ -10,7 +10,7 @@ fn main() -> Result<(), String> {
 
     let result = loop {
         match runner
-            .iterate(vec![Thrust::new(-55.,2)])
+            .iterate(vec![Thrust::new(-55.,2);runner.num_of_landers()])
             .map_err(|e| e.to_string())
         {
             Ok(simulation::ExecutionStatus::InProgress) => (),

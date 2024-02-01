@@ -2,9 +2,9 @@ use std::{fs::File, io::Read};
 
 use json::{self, JsonValue};
 
-use crate::{CollisionChecker, LanderState, Physics, LanderRunner, Terrain};
+use crate::{CollisionChecker, LanderRunner, LanderState, Physics, Terrain};
 
-pub fn from_file(file_path: String)-> Result<LanderRunner, String>{
+pub fn from_file(file_path: String) -> Result<LanderRunner, String> {
     runner_from_json(read_json(file_path)?)
 }
 
@@ -21,20 +21,24 @@ fn runner_from_json(json: JsonValue) -> Result<LanderRunner, String> {
     let mut initial_lander_state = LanderState::default();
 
     macro_rules! get_json {
-        ($key:literal, $func:ident) => {
-            json["Lander"][$key]
+        ($($key:literal),+, $func:ident) => {
+                get_json!(json$([$key])+, concat!($("/",$key),+), $func)
+        };
+
+        ($value:expr, $key:expr, $func:ident) => {
+            $value
                 .$func()
-                .ok_or("Couldn't find Lander/".to_owned() + $key)?
+                .ok_or(concat!("Couldn't find ", $key))?
         };
     }
 
-    initial_lander_state.x = get_json!("X", as_f64);
-    initial_lander_state.y = get_json!("Y", as_f64);
-    initial_lander_state.vx = get_json!("HSpeed", as_f64);
-    initial_lander_state.vy = get_json!("VSpeed", as_f64);
-    initial_lander_state.fuel = get_json!("Fuel", as_i32);
-    initial_lander_state.angle = get_json!("Angle", as_f64);
-    initial_lander_state.power = get_json!("Power", as_i32);
+    initial_lander_state.x = get_json!("Lander", "X", as_f64);
+    initial_lander_state.y = get_json!("Lander", "Y", as_f64);
+    initial_lander_state.vx = get_json!("Lander", "HSpeed", as_f64);
+    initial_lander_state.vy = get_json!("Lander", "VSpeed", as_f64);
+    initial_lander_state.fuel = get_json!("Lander", "Fuel", as_i32);
+    initial_lander_state.angle = get_json!("Lander", "Angle", as_f64);
+    initial_lander_state.power = get_json!("Lander", "Power", as_i32);
 
     let terrain_array = &json["Terrain"];
     if terrain_array.is_null() {
@@ -62,7 +66,7 @@ fn runner_from_json(json: JsonValue) -> Result<LanderRunner, String> {
 
     Ok(LanderRunner::new(
         initial_lander_state,
-        1,
+        get_json!("NumOfRunners", as_usize),
         Physics::default(),
         CollisionChecker::default(),
         terrain,

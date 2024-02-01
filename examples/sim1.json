@@ -1,4 +1,5 @@
 {
+    "NumOfRunners" : 500,
     "Lander": {
         "X": 2500,
         "Y": 2700,

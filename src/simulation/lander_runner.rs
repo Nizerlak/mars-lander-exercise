@@ -7,6 +7,7 @@ use crate::{
 #[derive(Debug)]
 pub enum Error {
     InconsistentState,
+    WrongNumberOfCommands { expected: usize, got: usize },
     SimulationError(SimulationError),
 }
 
@@ -14,6 +15,13 @@ impl ToString for Error {
     fn to_string(&self) -> String {
         format!("{:?}", self)
     }
+}
+
+#[derive(Debug)]
+pub enum ExecutionStatus {
+    InProgress,
+    Finished,
+    ExecutionLimitReached,
 }
 
 #[derive(Debug, Clone)]
@@ -29,12 +37,95 @@ impl Into<Error> for SimulationError {
     }
 }
 
-pub struct Runner {
-    pub states: Vec<FlightState>,
-    pub landers: Vec<LanderHistory>,
+pub struct LanderRunner {
+    states: Vec<FlightState>,
+    landers: Vec<LanderHistory>,
     physics: Physics,
     collision_checker: CollisionChecker,
     terrain: Terrain,
+    executions_left: Option<usize>,
+}
+
+impl LanderRunner {
+    pub fn new(
+        initial_lander_state: LanderState,
+        num_of_landers: usize,
+        physics: Physics,
+        collision_checker: CollisionChecker,
+        terrain: Terrain,
+    ) -> Self {
+        let lander_history = LanderHistory::with_initial_state(initial_lander_state);
+        Self {
+            physics,
+            collision_checker,
+            terrain,
+            states: vec![FlightState::Flying; num_of_landers],
+            landers: vec![lander_history; num_of_landers],
+            executions_left: None,
+        }
+    }
+
+    pub fn executions_limit(self, limit: usize) -> Self {
+        Self {
+            executions_left: Some(limit),
+            ..self
+        }
+    }
+
+    pub fn current_states(&self) -> impl Iterator<Item = (&FlightState, &LanderHistory)> {
+        self.states.iter().zip(&self.landers)
+    }
+
+    pub fn iterate(&mut self, cmds: Vec<Thrust>) -> Result<ExecutionStatus, Error> {
+        assert_eq!(self.states.len(), self.landers.len());
+
+        if cmds.len() != self.landers.len() {
+            return Err(Error::WrongNumberOfCommands {
+                expected: self.landers.len(),
+                got: cmds.len(),
+            });
+        }
+
+        if let Some(0) = self.executions_left {
+            return Ok(ExecutionStatus::ExecutionLimitReached);
+        }
+
+        let mut picked_any = false;
+
+        for ((lander_history, cmd), flight_state) in self
+            .landers
+            .iter_mut()
+            .zip(cmds)
+            .zip(self.states.iter_mut())
+        {
+            if let FlightState::Flying = *flight_state {
+                picked_any = true;
+                let lander = lander_history
+                    .last_lander_state()
+                    .ok_or(Error::InconsistentState)?;
+                let new_lander_state = self
+                    .physics
+                    .iterate(lander.clone(), cmd)
+                    .map_err(|e| e.into())?;
+                if let Some(landing) =
+                    self.collision_checker
+                        .check(&self.terrain, &lander, &new_lander_state)
+                {
+                    *flight_state = FlightState::Landed(landing);
+                }
+                lander_history.append_lander_state(new_lander_state);
+            }
+        }
+
+        if picked_any {
+            if let Some(ref mut exectuions_left) = self.executions_left {
+                *exectuions_left -= 1;
+            }
+            Ok(ExecutionStatus::InProgress)
+        } else {
+            Ok(ExecutionStatus::Finished)
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -91,7 +182,10 @@ impl LanderHistory {
 
     pub fn pretty_to_string(&self) -> String {
         self.iter_history().fold(
-            format!("{:8}{:8}{:8}{:8}{:8}{:8}{:8}","X", "Y", "VX", "VY", "FUEL", "ANGLE", "POWER"),
+            format!(
+                "{:8}{:8}{:8}{:8}{:8}{:8}{:8}",
+                "X", "Y", "VX", "VY", "FUEL", "ANGLE", "POWER"
+            ),
             |out,
              LanderState {
                  x,
@@ -135,57 +229,5 @@ impl LanderHistory {
                 angle: *angle,
                 power: *power,
             })
-    }
-}
-
-impl Runner {
-    pub fn new(
-        initial_lander_state: LanderState,
-        num_of_landers: usize,
-        physics: Physics,
-        collision_checker: CollisionChecker,
-        terrain: Terrain,
-    ) -> Self {
-        let lander_history = LanderHistory::with_initial_state(initial_lander_state);
-        Self {
-            physics,
-            collision_checker,
-            terrain,
-            states: vec![FlightState::Flying; num_of_landers],
-            landers: vec![lander_history; num_of_landers],
-        }
-    }
-
-    pub fn iterate(&mut self, cmds: Vec<Thrust>) -> Result<bool, Error> {
-        assert_eq!(cmds.len(), self.landers.len());
-
-        let mut picked_any = false;
-
-        for ((lander_history, cmd), flight_state) in self
-            .landers
-            .iter_mut()
-            .zip(cmds)
-            .zip(self.states.iter_mut())
-        {
-            if let FlightState::Flying = *flight_state {
-                picked_any = true;
-                let lander = lander_history
-                    .last_lander_state()
-                    .ok_or(Error::InconsistentState)?;
-                let new_lander_state = self
-                    .physics
-                    .iterate(lander.clone(), cmd)
-                    .map_err(|e| e.into())?;
-                if let Some(landing) =
-                    self.collision_checker
-                        .check(&self.terrain, &lander, &new_lander_state)
-                {
-                    *flight_state = FlightState::Landed(landing);
-                }
-                lander_history.append_lander_state(new_lander_state);
-            }
-        }
-
-        Ok(picked_any)
     }
 }

@@ -39,7 +39,7 @@ impl Into<Error> for SimulationError {
 
 pub struct LanderRunner {
     states: Vec<FlightState>,
-    landers: Vec<LanderHistory>,
+    landers: Vec<LanderState>,
     physics: Physics,
     collision_checker: CollisionChecker,
     terrain: Terrain,
@@ -54,13 +54,12 @@ impl LanderRunner {
         collision_checker: CollisionChecker,
         terrain: Terrain,
     ) -> Self {
-        let lander_history = LanderHistory::with_initial_state(initial_lander_state);
         Self {
             physics,
             collision_checker,
             terrain,
             states: vec![FlightState::Flying; num_of_landers],
-            landers: vec![lander_history; num_of_landers],
+            landers: vec![initial_lander_state; num_of_landers],
             executions_left: None,
         }
     }
@@ -76,7 +75,7 @@ impl LanderRunner {
         self.landers.len()
     }
 
-    pub fn current_states(&self) -> impl Iterator<Item = (&FlightState, &LanderHistory)> {
+    pub fn current_states(&self) -> impl Iterator<Item = (&FlightState, &LanderState)> {
         self.states.iter().zip(&self.landers)
     }
 
@@ -96,7 +95,7 @@ impl LanderRunner {
 
         let mut picked_any = false;
 
-        for ((lander_history, cmd), flight_state) in self
+        for ((lander, cmd), flight_state) in self
             .landers
             .iter_mut()
             .zip(cmds)
@@ -104,9 +103,6 @@ impl LanderRunner {
         {
             if let FlightState::Flying = *flight_state {
                 picked_any = true;
-                let lander = lander_history
-                    .last_lander_state()
-                    .ok_or(Error::InconsistentState)?;
                 let new_lander_state = self
                     .physics
                     .iterate(lander.clone(), cmd)
@@ -117,7 +113,7 @@ impl LanderRunner {
                 {
                     *flight_state = FlightState::Landed(landing);
                 }
-                lander_history.append_lander_state(new_lander_state);
+                *lander = new_lander_state;
             }
         }
 
@@ -144,7 +140,7 @@ pub struct LanderHistory {
 }
 
 impl LanderHistory {
-    fn with_initial_state(state: LanderState) -> Self {
+    pub fn with_initial_state(state: LanderState) -> Self {
         let LanderState {
             x,
             y,
@@ -205,7 +201,7 @@ impl LanderHistory {
         )
     }
 
-    fn append_lander_state(&mut self, state: LanderState) {
+    pub fn append_lander_state(&mut self, state: &LanderState) {
         self.x.push(state.x);
         self.y.push(state.y);
         self.vx.push(state.vx);

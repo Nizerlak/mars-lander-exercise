@@ -164,7 +164,7 @@ impl Physics {
 
         // update position
         lander.x += lander.vx * self.dt + t_x / 2. * self.dt.powf(2.);
-        lander.y += lander.vy * self.dt + (t_y - defaults::G) / 2. * self.dt.powf(2.);
+        lander.y += lander.vy * self.dt + (t_y - self.g) / 2. * self.dt.powf(2.);
 
         // update velocity
         lander.vx += t_x * self.dt;

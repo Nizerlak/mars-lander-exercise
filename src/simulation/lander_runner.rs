@@ -75,8 +75,12 @@ impl LanderRunner {
         self.landers.len()
     }
 
-    pub fn current_states(&self) -> impl Iterator<Item = (&FlightState, &LanderState)> {
-        self.states.iter().zip(&self.landers)
+    pub fn current_landers_states(&self) -> impl Iterator<Item = &LanderState> {
+        self.landers.iter()
+    }
+
+    pub fn current_flight_states(&self) -> impl Iterator<Item = &FlightState> {
+        self.states.iter()
     }
 
     pub fn iterate(&mut self, cmds: Vec<Thrust>) -> Result<ExecutionStatus, Error> {

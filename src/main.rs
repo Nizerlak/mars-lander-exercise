@@ -1,4 +1,5 @@
 use simulation::init;
+use simulation::FlightState;
 use simulation::LanderHistory;
 use simulation::Thrust;
 use std::env;
@@ -8,8 +9,8 @@ fn main() -> Result<(), String> {
 
     let mut runner = init::json::from_file(file_path)?;
     let mut flight_histories: Vec<_> = runner
-        .current_states()
-        .map(|(_, s)| LanderHistory::with_initial_state(s.clone()))
+        .current_landers_states()
+        .map(|s| LanderHistory::with_initial_state(s.clone()))
         .collect();
 
     let now = std::time::Instant::now();
@@ -20,15 +21,23 @@ fn main() -> Result<(), String> {
         {
             Ok(simulation::ExecutionStatus::InProgress) => flight_histories
                 .iter_mut()
-                .zip(runner.current_states())
-                .for_each(|(h, (_, s))| h.append_lander_state(s)),
+                .zip(runner.current_landers_states())
+                .zip(runner.current_flight_states())
+                .filter_map(|(x, s)| {
+                    if let FlightState::Flying = s {
+                        Some(x)
+                    } else {
+                        None
+                    }
+                })
+                .for_each(|(h, s)| h.append_lander_state(s)),
             e => break e,
         }
     };
     let elapsed = now.elapsed();
     println!("Run ended with result: {result:?} time: {elapsed:?}");
 
-    let (flight_state, _) = runner.current_states().next().unwrap();
+    let flight_state = runner.current_flight_states().next().unwrap();
     println!("{}", flight_histories[0].pretty_to_string());
 
     println!("Finished {:?}", flight_state);

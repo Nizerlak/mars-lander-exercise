@@ -5,9 +5,10 @@ use simulation::Thrust;
 use std::env;
 
 fn main() -> Result<(), String> {
-    let file_path = env::args().nth(1).ok_or("Lacking path argument")?;
+    let sim_file_path = env::args().nth(1).ok_or("Lacking simulation path argument")?;
+    let settings_file_path = env::args().nth(2).ok_or("Lacking settings path argument")?;
 
-    let mut runner = init::json::from_file(file_path)?;
+    let mut runner = init::json::from_file(sim_file_path, settings_file_path)?;
     let mut flight_histories: Vec<_> = runner
         .current_landers_states()
         .map(|s| LanderHistory::with_initial_state(s.clone()))

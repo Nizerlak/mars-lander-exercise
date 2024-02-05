@@ -1,13 +1,14 @@
 pub use crate::physics::SimulationError;
 use crate::{
-    physics::{LanderState, Physics, Thrust},
+    physics::{LanderState, Physics},
+    solver::CommandProvider,
     CollisionChecker, Landing, Terrain,
 };
 
 #[derive(Debug)]
 pub enum Error {
     InconsistentState,
-    WrongNumberOfCommands { expected: usize, got: usize },
+    CommandGetError { id: usize },
     SimulationError(SimulationError),
 }
 
@@ -71,7 +72,7 @@ impl LanderRunner {
         }
     }
 
-    pub fn num_of_landers(&self) -> usize{
+    pub fn num_of_landers(&self) -> usize {
         self.landers.len()
     }
 
@@ -83,15 +84,11 @@ impl LanderRunner {
         self.states.iter()
     }
 
-    pub fn iterate(&mut self, cmds: Vec<Thrust>) -> Result<ExecutionStatus, Error> {
+    pub fn iterate(
+        &mut self,
+        command_provider: &impl CommandProvider,
+    ) -> Result<ExecutionStatus, Error> {
         assert_eq!(self.states.len(), self.landers.len());
-
-        if cmds.len() != self.landers.len() {
-            return Err(Error::WrongNumberOfCommands {
-                expected: self.landers.len(),
-                got: cmds.len(),
-            });
-        }
 
         if let Some(0) = self.executions_left {
             return Ok(ExecutionStatus::ExecutionLimitReached);
@@ -99,14 +96,17 @@ impl LanderRunner {
 
         let mut picked_any = false;
 
-        for ((lander, cmd), flight_state) in self
+        for (id, (lander, flight_state)) in self
             .landers
             .iter_mut()
-            .zip(cmds)
             .zip(self.states.iter_mut())
+            .enumerate()
         {
             if let FlightState::Flying = *flight_state {
                 picked_any = true;
+                let cmd = command_provider
+                    .get_cmd(id)
+                    .ok_or(Error::CommandGetError { id })?;
                 let new_lander_state = self
                     .physics
                     .iterate(lander.clone(), cmd)

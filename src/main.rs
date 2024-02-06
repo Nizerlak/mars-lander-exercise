@@ -1,11 +1,5 @@
 use rand::Rng;
-use simulation::init;
-use simulation::CommandProvider;
-use simulation::ExecutionStatus;
-use simulation::FlightState;
-use simulation::LanderHistory;
-use simulation::LanderRunner;
-use simulation::Thrust;
+use simulation::*;
 use std::env;
 
 struct DummyCommandProvider {}
@@ -77,8 +71,8 @@ impl App {
 fn main() -> Result<(), String> {
     let sim_file_path = env::args()
         .nth(1)
-        .ok_or("Lacking simulation path argument")?;
-    let settings_file_path = env::args().nth(2).ok_or("Lacking settings path argument")?;
+        .expect("Lacking simulation path argument");
+    let settings_file_path = env::args().nth(2).expect("Lacking settings path argument");
 
     let mut app = App::try_new(sim_file_path, settings_file_path)?;
     let now = std::time::Instant::now();

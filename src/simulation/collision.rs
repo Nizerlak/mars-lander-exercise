@@ -1,4 +1,4 @@
-use crate::LanderState;
+use super::LanderState;
 
 mod defaults {
     pub const MAX_X: f64 = 7000.;

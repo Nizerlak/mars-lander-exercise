@@ -1,8 +1,6 @@
-use std::{fs::File, io::Read};
-
+use crate::simulation::*;
 use json::{self, JsonValue};
-
-use crate::{CollisionChecker, LanderRunner, LanderState, Physics, Terrain};
+use std::{fs::File, io::Read};
 
 macro_rules! get_json {
     ($json:ident,$($key:literal),+, $func:ident) => {
@@ -29,7 +27,10 @@ macro_rules! json_value_or_err {
     };
 }
 
-pub fn from_file(sim_file_path: String, settings_file_path: String) -> Result<LanderRunner, String> {
+pub fn from_file(
+    sim_file_path: String,
+    settings_file_path: String,
+) -> Result<LanderRunner, String> {
     let sim_json = read_json(sim_file_path)?;
     let settings_json = read_json(settings_file_path)?;
     Ok(LanderRunner::new(

@@ -11,3 +11,4 @@ path="src/simulation/lib.rs"
 
 [dependencies]
 json = "0.12.4"
+rand = "0.8"

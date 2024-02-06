@@ -165,25 +165,6 @@ impl LanderHistory {
         }
     }
 
-    fn last_lander_state(&self) -> Option<LanderState> {
-        let x = *self.x.last()?;
-        let y = *self.y.last()?;
-        let vx = *self.vx.last()?;
-        let vy = *self.vy.last()?;
-        let fuel = *self.fuel.last()?;
-        let angle = *self.angle.last()?;
-        let power = *self.power.last()?;
-        Some(LanderState {
-            x,
-            y,
-            vx,
-            vy,
-            fuel,
-            angle,
-            power,
-        })
-    }
-
     pub fn pretty_to_string(&self) -> String {
         self.iter_history().fold(
             format!(

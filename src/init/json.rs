@@ -27,17 +27,19 @@ macro_rules! json_value_or_err {
     };
 }
 
-pub fn from_file(
-    sim_file_path: String,
-    settings_file_path: String,
-) -> Result<LanderRunner, String> {
-    let sim_json = read_json(sim_file_path)?;
+pub fn parse_settings(settings_file_path: String) -> Result<Settings, String> {
     let settings_json = read_json(settings_file_path)?;
-    Ok(LanderRunner::new(
+
+    Ok(Settings {
+        num_of_runners: get_json!(settings_json, "NumOfRunners", as_usize),
+    })
+}
+
+pub fn parse_sim(sim_file_path: String) -> Result<(LanderState, Terrain), String> {
+    let sim_json = read_json(sim_file_path)?;
+
+    Ok((
         parse_lander(&sim_json)?,
-        get_json!(settings_json, "NumOfRunners", as_usize),
-        Physics::default(),
-        CollisionChecker::default(),
         parse_terrain(json_value_or_err!(sim_json, "Terrain")?)?,
     ))
 }

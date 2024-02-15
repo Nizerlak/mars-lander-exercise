@@ -1,6 +1,5 @@
 pub use crate::simulation::*;
 
-
 #[derive(Debug)]
 pub enum Error {
     InconsistentState,
@@ -39,7 +38,6 @@ pub struct LanderRunner {
     landers: Vec<LanderState>,
     physics: Physics,
     collision_checker: CollisionChecker,
-    terrain: Terrain,
     executions_left: Option<usize>,
 }
 
@@ -49,12 +47,10 @@ impl LanderRunner {
         num_of_landers: usize,
         physics: Physics,
         collision_checker: CollisionChecker,
-        terrain: Terrain,
     ) -> Self {
         Self {
             physics,
             collision_checker,
-            terrain,
             states: vec![FlightState::Flying; num_of_landers],
             landers: vec![initial_lander_state; num_of_landers],
             executions_left: None,
@@ -64,6 +60,14 @@ impl LanderRunner {
     pub fn executions_limit(self, limit: usize) -> Self {
         Self {
             executions_left: Some(limit),
+            ..self
+        }
+    }
+
+    pub fn with_initial_state(self, initial_lander_state: LanderState) -> Self {
+        Self {
+            states: vec![FlightState::Flying; self.num_of_landers()],
+            landers: vec![initial_lander_state; self.num_of_landers()],
             ..self
         }
     }
@@ -83,6 +87,7 @@ impl LanderRunner {
     pub fn iterate(
         &mut self,
         command_provider: &impl CommandProvider,
+        terrain: &Terrain,
     ) -> Result<ExecutionStatus, Error> {
         assert_eq!(self.states.len(), self.landers.len());
 
@@ -109,7 +114,7 @@ impl LanderRunner {
                     .map_err(|e| e.into())?;
                 if let Some(landing) =
                     self.collision_checker
-                        .check(&self.terrain, &lander, &new_lander_state)
+                        .check(terrain, &lander, &new_lander_state)
                 {
                     *flight_state = FlightState::Landed(landing);
                 }

@@ -10,6 +10,7 @@ impl CommandProvider for DummyCommandProvider {
 }
 
 pub struct App {
+    terrain: Terrain,
     lander_runner: LanderRunner,
     flight_histories: Vec<LanderHistory>,
     cmd_provider: DummyCommandProvider,
@@ -17,7 +18,14 @@ pub struct App {
 
 impl App {
     pub fn try_new(sim_file_path: String, settings_file_path: String) -> Result<Self, String> {
-        let lander_runner = init::json::from_file(sim_file_path, settings_file_path)?;
+        let (initial_lander_state, terrain) = init::json::parse_sim(sim_file_path)?;
+        let settings = init::json::parse_settings(settings_file_path)?;
+        let lander_runner = LanderRunner::new(
+            initial_lander_state,
+            settings.num_of_runners,
+            Physics::default(),
+            CollisionChecker::default(),
+        );
         let flight_histories: Vec<_> = lander_runner
             .current_landers_states()
             .map(|s| LanderHistory::with_initial_state(s.clone()))
@@ -25,6 +33,7 @@ impl App {
         let cmd_provider = DummyCommandProvider {};
 
         Ok(Self {
+            terrain,
             lander_runner,
             flight_histories,
             cmd_provider,
@@ -35,7 +44,7 @@ impl App {
         loop {
             match self
                 .lander_runner
-                .iterate(&self.cmd_provider)
+                .iterate(&self.cmd_provider, &self.terrain)
                 .map_err(|e| e.to_string())
             {
                 Ok(ExecutionStatus::InProgress) => self.save_last_lander_states(),

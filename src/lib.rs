@@ -1,5 +1,4 @@
 mod app;
-pub mod gui;
 pub mod init;
 mod simulation;
 

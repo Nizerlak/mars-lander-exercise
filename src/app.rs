@@ -41,19 +41,32 @@ impl App {
     }
 
     pub fn run(&mut self) -> Result<ExecutionStatus, String> {
-        loop {
+        let res = loop {
             match self
                 .lander_runner
                 .iterate(&self.cmd_provider, &self.terrain)
                 .map_err(|e| e.to_string())
             {
-                Ok(ExecutionStatus::InProgress) => self.save_last_lander_states(),
+                Ok(ExecutionStatus::InProgress) => self.save_last_lander_states_in_flight(),
                 e => break e,
             }
-        }
+        };
+        self.save_last_lander_states();
+        res
     }
 
-    fn save_last_lander_states(&mut self) {
+    pub fn get_routes(&self) -> Vec<Vec<(f64, f64)>> {
+        self.flight_histories
+            .iter()
+            .map(|h| h.iter_position().collect())
+            .collect()
+    }
+
+    pub fn get_terrain(&self) -> &Terrain {
+        &self.terrain
+    }
+
+    fn save_last_lander_states_in_flight(&mut self) {
         self.flight_histories
             .iter_mut()
             .zip(self.lander_runner.current_landers_states())
@@ -65,6 +78,13 @@ impl App {
                     None
                 }
             })
+            .for_each(|(h, s)| h.append_lander_state(s))
+    }
+
+    fn save_last_lander_states(&mut self) {
+        self.flight_histories
+            .iter_mut()
+            .zip(self.lander_runner.current_landers_states())
             .for_each(|(h, s)| h.append_lander_state(s))
     }
 

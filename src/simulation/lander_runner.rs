@@ -216,4 +216,8 @@ impl LanderHistory {
                 power: *power,
             })
     }
+
+    pub fn iter_position(&self) -> impl Iterator<Item = (f64, f64)> + '_ {
+        self.x.iter().zip(&self.y).map(|(x, y)| (*x, *y))
+    }
 }

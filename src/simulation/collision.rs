@@ -46,13 +46,14 @@ impl CollisionChecker {
         terrain: &Terrain,
         previous_state: &LanderState,
         current_state: &LanderState,
-    ) -> Option<Landing> {
-        if current_state.x < 0.
-            || current_state.x > self.max_x
-            || current_state.y < 0.
-            || current_state.y > self.max_y
-        {
-            return Some(Landing::OutOfMap);
+    ) -> Option<((f64, f64), Landing)> {
+        let (x, y) = (current_state.x, current_state.y);
+        if x < 0. || x > self.max_x || y < 0. || y > self.max_y {
+            let clamp = |a: f64, min: f64, max: f64| max.min(min.max(a));
+            return Some((
+                (clamp(x, 0., self.max_x), clamp(y, 0., self.max_y)),
+                Landing::OutOfMap,
+            ));
         }
         for (x, y) in terrain.x.windows(2).zip(terrain.y.windows(2)) {
             let [tx1, tx2] = *x else { panic!() };
@@ -63,19 +64,20 @@ impl CollisionChecker {
                 Vec2::new(previous_state.x, previous_state.y),
                 Vec2::new(current_state.x, current_state.y),
             );
-            if let Some(_) = check_collision(terrain_segment, lander_path_segment) {
+            if let Some(collsiion_point) = check_collision(terrain_segment, lander_path_segment) {
                 // non-flat terrain
-                if ty1 != ty2 {
-                    return Some(Landing::WrongTerrain);
+                let colision_state = if ty1 != ty2 {
+                    Landing::WrongTerrain
                 } else if current_state.angle != 0. {
-                    return Some(Landing::NotVertical);
+                    Landing::NotVertical
                 } else if current_state.vx.abs() > self.max_horizontal_speed {
-                    return Some(Landing::TooFastHorizontal);
+                    Landing::TooFastHorizontal
                 } else if current_state.vy.abs() > self.max_vertical_speed {
-                    return Some(Landing::TooFastVertical);
+                    Landing::TooFastVertical
                 } else {
-                    return Some(Landing::Correct);
-                }
+                    Landing::Correct
+                };
+                return Some((collsiion_point, colision_state));
             }
         }
         None
@@ -224,7 +226,7 @@ mod collision_checker_tests {
             checker()
                 .check(&terrain(), &previous_state, &current_state)
                 .unwrap(),
-            Landing::OutOfMap
+            ((x, y), Landing::OutOfMap) if x ==0. && y == 700.
         ));
     }
 
@@ -237,7 +239,7 @@ mod collision_checker_tests {
             checker()
                 .check(&terrain(), &previous_state, &current_state)
                 .unwrap(),
-            Landing::OutOfMap
+            ((x, y), Landing::OutOfMap) if x == 7000. && y == 700.
         ));
     }
 
@@ -250,7 +252,7 @@ mod collision_checker_tests {
             checker()
                 .check(&terrain(), &previous_state, &current_state)
                 .unwrap(),
-            Landing::OutOfMap
+            ((x, y), Landing::OutOfMap) if x == 1500. && y == 0.
         ));
     }
 
@@ -263,7 +265,33 @@ mod collision_checker_tests {
             checker()
                 .check(&terrain(), &previous_state, &current_state)
                 .unwrap(),
-            Landing::OutOfMap
+            ((x, y), Landing::OutOfMap) if x == 1500. && y == 3000.
+        ));
+    }
+
+    #[test]
+    fn out_of_map5() {
+        let previous_state = LanderState::default().with_x(1000.).with_y(500.);
+        let current_state = LanderState::default().with_x(7100.).with_y(5000.);
+
+        assert!(matches!(
+            checker()
+                .check(&terrain(), &previous_state, &current_state)
+                .unwrap(),
+            ((x, y), Landing::OutOfMap) if x == 7000. && y == 3000.
+        ));
+    }
+
+    #[test]
+    fn out_of_map6() {
+        let previous_state = LanderState::default().with_x(1000.).with_y(500.);
+        let current_state = LanderState::default().with_x(-5.).with_y(-5.);
+
+        assert!(matches!(
+            checker()
+                .check(&terrain(), &previous_state, &current_state)
+                .unwrap(),
+            ((x, y), Landing::OutOfMap) if x == 0. && y == 0.
         ));
     }
 
@@ -276,7 +304,7 @@ mod collision_checker_tests {
             checker()
                 .check(&terrain(), &previous_state, &current_state)
                 .unwrap(),
-            Landing::WrongTerrain
+            (_, Landing::WrongTerrain)
         ));
     }
 
@@ -292,7 +320,7 @@ mod collision_checker_tests {
             checker()
                 .check(&terrain(), &previous_state, &current_state)
                 .unwrap(),
-            Landing::NotVertical
+            ((x, y), Landing::NotVertical) if x == 1500. && y == 100.
         ));
     }
 
@@ -308,7 +336,7 @@ mod collision_checker_tests {
             checker()
                 .check(&terrain(), &previous_state, &current_state)
                 .unwrap(),
-            Landing::NotVertical
+            ((x, y), Landing::NotVertical) if x == 1500. && y == 100.
         ));
     }
 
@@ -325,7 +353,7 @@ mod collision_checker_tests {
             checker()
                 .check(&terrain(), &previous_state, &current_state)
                 .unwrap(),
-            Landing::TooFastVertical
+            ((x, y), Landing::TooFastVertical) if x == 1500. && y == 100.
         ));
     }
 
@@ -343,7 +371,7 @@ mod collision_checker_tests {
             checker()
                 .check(&terrain(), &previous_state, &current_state)
                 .unwrap(),
-            Landing::TooFastHorizontal
+            ((x, y), Landing::TooFastHorizontal) if x == 1500. && y == 100.
         ));
     }
 
@@ -361,12 +389,12 @@ mod collision_checker_tests {
             checker()
                 .check(&terrain(), &previous_state, &current_state)
                 .unwrap(),
-            Landing::TooFastHorizontal
+            ((x, y), Landing::TooFastHorizontal) if x == 1500. && y == 100.
         ));
     }
 
     #[test]
-    fn correct(){
+    fn correct() {
         let previous_state = LanderState::default().with_x(1000.).with_y(500.);
         let current_state = LanderState::default()
             .with_x(1500.)
@@ -379,7 +407,7 @@ mod collision_checker_tests {
             checker()
                 .check(&terrain(), &previous_state, &current_state)
                 .unwrap(),
-            Landing::Correct
+            ((x, y), Landing::Correct) if x == 1500. && y == 100.
         ));
     }
 }

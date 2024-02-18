@@ -108,15 +108,17 @@ impl LanderRunner {
                 let cmd = command_provider
                     .get_cmd(id)
                     .ok_or(Error::CommandGetError { id })?;
-                let new_lander_state = self
+                let mut new_lander_state = self
                     .physics
                     .iterate(lander.clone(), cmd)
                     .map_err(|e| e.into())?;
-                if let Some(landing) =
+                if let Some(((x, y), landing)) =
                     self.collision_checker
                         .check(terrain, &lander, &new_lander_state)
                 {
                     *flight_state = FlightState::Landed(landing);
+                    new_lander_state.x = x;
+                    new_lander_state.y = y;
                 }
                 *lander = new_lander_state;
             }

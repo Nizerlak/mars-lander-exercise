@@ -55,11 +55,8 @@ impl App {
         res
     }
 
-    pub fn get_routes(&self) -> Vec<Vec<(f64, f64)>> {
-        self.flight_histories
-            .iter()
-            .map(|h| h.iter_position().collect())
-            .collect()
+    pub fn get_routes(&self) -> impl Iterator<Item = impl Iterator<Item = LanderState> + '_> + '_ {
+        self.flight_histories.iter().map(|h| h.iter_history())
     }
 
     pub fn get_terrain(&self) -> &Terrain {

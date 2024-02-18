@@ -199,7 +199,7 @@ impl LanderHistory {
         self.power.push(state.power);
     }
 
-    fn iter_history(&self) -> impl Iterator<Item = LanderState> + '_ {
+    pub fn iter_history(&self) -> impl Iterator<Item = LanderState> + '_ {
         self.x
             .iter()
             .zip(&self.y)
@@ -217,9 +217,5 @@ impl LanderHistory {
                 angle: *angle,
                 power: *power,
             })
-    }
-
-    pub fn iter_position(&self) -> impl Iterator<Item = (f64, f64)> + '_ {
-        self.x.iter().zip(&self.y).map(|(x, y)| (*x, *y))
     }
 }

@@ -1,12 +1,28 @@
 use std::sync::{Arc, Mutex};
 
 use axum::{extract::State, response::Json, routing::get, Router};
+use serde::Serialize;
 use serde_json::Value;
-use simulation::App;
+use simulation::{App, LanderState};
 use std::env;
 use tower_http::cors::CorsLayer;
 
 // https://docs.rs/axum/latest/axum/index.html#using-the-state-extractor
+
+#[derive(Serialize)]
+struct Telemetry {
+    vx: f64,
+    vy: f64,
+    fuel: i32,
+    angle: f64,
+    power: i32,
+}
+
+#[derive(Serialize)]
+struct Route {
+    telemetry: Vec<Telemetry>,
+    positions: Vec<(f64, f64)>,
+}
 
 #[derive(Clone)]
 struct AppState {
@@ -30,10 +46,7 @@ async fn main() {
     // build our application with a single route
     let router = Router::new()
         .route("/terrain", get(handle_terrain))
-        .route(
-            "/routes",
-            get(handle_routes),
-        )
+        .route("/routes", get(handle_routes))
         .with_state(app)
         .layer(CorsLayer::permissive());
 
@@ -57,5 +70,38 @@ async fn handle_terrain(State(state): State<AppState>) -> Json<Value> {
 async fn handle_routes(State(state): State<AppState>) -> Json<Value> {
     let mut app = state.state.lock().unwrap();
     let _ = app.run();
-    Json(serde_json::to_value(app.get_routes()).unwrap())
+    let routes = app
+        .get_routes()
+        .map(lander_states_to_route)
+        .collect::<Vec<_>>();
+    Json(serde_json::to_value(routes).unwrap())
+}
+
+fn lander_states_to_route(states: impl Iterator<Item = LanderState>) -> Route {
+    states.fold(
+        Route {
+            positions: Vec::new(),
+            telemetry: Vec::new(),
+        },
+        |mut route, state| {
+            let LanderState {
+                x,
+                y,
+                vx,
+                vy,
+                fuel,
+                angle,
+                power,
+            } = state;
+            route.positions.push((x, y));
+            route.telemetry.push(Telemetry {
+                vx,
+                vy,
+                fuel,
+                angle,
+                power,
+            });
+            route
+        },
+    )
 }

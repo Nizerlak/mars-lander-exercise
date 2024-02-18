@@ -27,7 +27,7 @@ fetch('http://0.0.0.0:3000/routes')
         console.log("Got routes");
         const routes = await response.json();
         for (const route of routes) {
-            drawLine(route, 'green');
+            drawLine(route['positions'], 'green');
         }
     });
 

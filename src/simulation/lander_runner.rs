@@ -64,12 +64,9 @@ impl LanderRunner {
         }
     }
 
-    pub fn with_initial_state(self, initial_lander_state: LanderState) -> Self {
-        Self {
-            states: vec![FlightState::Flying; self.num_of_landers()],
-            landers: vec![initial_lander_state; self.num_of_landers()],
-            ..self
-        }
+    pub fn reinitialize(&mut self, initial_lander_state: LanderState) {
+        self.states = vec![FlightState::Flying; self.num_of_landers()];
+        self.landers = vec![initial_lander_state; self.num_of_landers()];
     }
 
     pub fn num_of_landers(&self) -> usize {

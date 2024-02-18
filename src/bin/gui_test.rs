@@ -69,6 +69,7 @@ async fn handle_terrain(State(state): State<AppState>) -> Json<Value> {
 
 async fn handle_routes(State(state): State<AppState>) -> Json<Value> {
     let mut app = state.state.lock().unwrap();
+    app.reset();
     let _ = app.run();
     let routes = app
         .get_routes()

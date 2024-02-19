@@ -24,7 +24,6 @@ pub enum ExecutionStatus {
 pub enum FlightState {
     Flying,
     Landed(Landing),
-    OutsideMap,
 }
 
 impl Into<Error> for SimulationError {

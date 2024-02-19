@@ -19,9 +19,39 @@ struct Telemetry {
 }
 
 #[derive(Serialize)]
+pub enum FlightState {
+    Flying,
+    LandedCorrectly,
+    CrashedWrongTerrain,
+    CrashedNotVertical,
+    CrashedTooFastVertical,
+    CrashedTooFastHorizontal,
+    OutOfMap,
+}
+
+impl From<&simulation::FlightState> for FlightState {
+    fn from(value: &simulation::FlightState) -> Self {
+        type FS = simulation::FlightState;
+        type L = simulation::Landing;
+        match value {
+            FS::Flying => Self::Flying,
+            FS::Landed(landing) => match landing {
+                L::Correct => Self::LandedCorrectly,
+                L::WrongTerrain => Self::CrashedWrongTerrain,
+                L::NotVertical => Self::CrashedNotVertical,
+                L::TooFastVertical => Self::CrashedTooFastVertical,
+                L::TooFastHorizontal => Self::CrashedTooFastHorizontal,
+                L::OutOfMap => Self::OutOfMap,
+            },
+        }
+    }
+}
+
+#[derive(Serialize)]
 struct Route {
     telemetry: Vec<Telemetry>,
     positions: Vec<(f64, f64)>,
+    flight_state: FlightState,
 }
 
 #[derive(Clone)]
@@ -73,16 +103,20 @@ async fn handle_routes(State(state): State<AppState>) -> Json<Value> {
     let _ = app.run();
     let routes = app
         .get_routes()
+        .zip(app.get_current_states())
         .map(lander_states_to_route)
         .collect::<Vec<_>>();
     Json(serde_json::to_value(routes).unwrap())
 }
 
-fn lander_states_to_route(states: impl Iterator<Item = LanderState>) -> Route {
+fn lander_states_to_route(
+    (states, flight_state): (impl Iterator<Item = LanderState>, &simulation::FlightState),
+) -> Route {
     states.fold(
         Route {
             positions: Vec::new(),
             telemetry: Vec::new(),
+            flight_state: FlightState::from(flight_state),
         },
         |mut route, state| {
             let LanderState {

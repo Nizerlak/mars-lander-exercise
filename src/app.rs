@@ -70,6 +70,11 @@ impl App {
         self.flight_histories.iter().map(|h| h.iter_history())
     }
 
+    pub fn get_current_states(&self) -> impl Iterator<Item = &FlightState> + '_ {
+        self.lander_runner
+            .current_flight_states()
+    }
+
     pub fn get_terrain(&self) -> &Terrain {
         &self.terrain
     }

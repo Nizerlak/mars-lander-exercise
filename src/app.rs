@@ -4,7 +4,7 @@ use rand::Rng;
 struct DummyCommandProvider {}
 
 impl CommandProvider for DummyCommandProvider {
-    fn get_cmd(&self, _: usize) -> Option<Thrust> {
+    fn get_cmd(&self, _: usize, _: usize) -> Option<Thrust> {
         Some(Thrust::new(-55., 2 + rand::thread_rng().gen_range(0..=1)))
     }
 }

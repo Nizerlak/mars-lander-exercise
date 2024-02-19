@@ -38,6 +38,7 @@ pub struct LanderRunner {
     physics: Physics,
     collision_checker: CollisionChecker,
     executions_left: Option<usize>,
+    iteration_id: usize,
 }
 
 impl LanderRunner {
@@ -53,6 +54,7 @@ impl LanderRunner {
             states: vec![FlightState::Flying; num_of_landers],
             landers: vec![initial_lander_state; num_of_landers],
             executions_left: None,
+            iteration_id: 0,
         }
     }
 
@@ -102,7 +104,7 @@ impl LanderRunner {
             if let FlightState::Flying = *flight_state {
                 picked_any = true;
                 let cmd = command_provider
-                    .get_cmd(id)
+                    .get_cmd(id, self.iteration_id)
                     .ok_or(Error::CommandGetError { id })?;
                 let mut new_lander_state = self
                     .physics
@@ -123,6 +125,7 @@ impl LanderRunner {
         if picked_any {
             if let Some(ref mut exectuions_left) = self.executions_left {
                 *exectuions_left -= 1;
+                self.iteration_id += 1;
             }
             Ok(ExecutionStatus::InProgress)
         } else {

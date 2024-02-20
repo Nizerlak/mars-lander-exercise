@@ -16,9 +16,9 @@ pub struct Terrain {
 pub enum Landing {
     Correct,
     WrongTerrain,
-    NotVertical,
-    TooFastVertical,
-    TooFastHorizontal,
+    NotVertical { error: f64 },
+    TooFastVertical { error: f64 },
+    TooFastHorizontal { error: f64 },
     OutOfMap,
 }
 
@@ -69,11 +69,17 @@ impl CollisionChecker {
                 let colision_state = if ty1 != ty2 {
                     Landing::WrongTerrain
                 } else if current_state.angle != 0. {
-                    Landing::NotVertical
+                    Landing::NotVertical {
+                        error: current_state.angle,
+                    }
                 } else if current_state.vx.abs() > self.max_horizontal_speed {
-                    Landing::TooFastHorizontal
+                    Landing::TooFastHorizontal {
+                        error: current_state.vx.abs() - self.max_horizontal_speed,
+                    }
                 } else if current_state.vy.abs() > self.max_vertical_speed {
-                    Landing::TooFastVertical
+                    Landing::TooFastVertical {
+                        error: current_state.vy.abs() - self.max_vertical_speed,
+                    }
                 } else {
                     Landing::Correct
                 };
@@ -320,7 +326,7 @@ mod collision_checker_tests {
             checker()
                 .check(&terrain(), &previous_state, &current_state)
                 .unwrap(),
-            ((x, y), Landing::NotVertical) if x == 1500. && y == 100.
+            ((x, y), Landing::NotVertical{error}) if x == 1500. && y == 100. && error == 10.
         ));
     }
 
@@ -336,7 +342,7 @@ mod collision_checker_tests {
             checker()
                 .check(&terrain(), &previous_state, &current_state)
                 .unwrap(),
-            ((x, y), Landing::NotVertical) if x == 1500. && y == 100.
+            ((x, y), Landing::NotVertical{error}) if x == 1500. && y == 100. && error == -10.
         ));
     }
 
@@ -353,7 +359,7 @@ mod collision_checker_tests {
             checker()
                 .check(&terrain(), &previous_state, &current_state)
                 .unwrap(),
-            ((x, y), Landing::TooFastVertical) if x == 1500. && y == 100.
+            ((x, y), Landing::TooFastVertical{error}) if x == 1500. && y == 100. && error == 5.
         ));
     }
 
@@ -371,7 +377,7 @@ mod collision_checker_tests {
             checker()
                 .check(&terrain(), &previous_state, &current_state)
                 .unwrap(),
-            ((x, y), Landing::TooFastHorizontal) if x == 1500. && y == 100.
+            ((x, y), Landing::TooFastHorizontal{error}) if x == 1500. && y == 100. && error == 10.
         ));
     }
 
@@ -389,7 +395,7 @@ mod collision_checker_tests {
             checker()
                 .check(&terrain(), &previous_state, &current_state)
                 .unwrap(),
-            ((x, y), Landing::TooFastHorizontal) if x == 1500. && y == 100.
+            ((x, y), Landing::TooFastHorizontal{error}) if x == 1500. && y == 100. && error == 10.
         ));
     }
 

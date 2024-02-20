@@ -38,9 +38,9 @@ impl From<&simulation::FlightState> for FlightState {
             FS::Landed(landing) => match landing {
                 L::Correct => Self::LandedCorrectly,
                 L::WrongTerrain => Self::CrashedWrongTerrain,
-                L::NotVertical => Self::CrashedNotVertical,
-                L::TooFastVertical => Self::CrashedTooFastVertical,
-                L::TooFastHorizontal => Self::CrashedTooFastHorizontal,
+                L::NotVertical{error: _} => Self::CrashedNotVertical,
+                L::TooFastVertical{error: _} => Self::CrashedTooFastVertical,
+                L::TooFastHorizontal{error: _} => Self::CrashedTooFastHorizontal,
                 L::OutOfMap => Self::OutOfMap,
             },
         }

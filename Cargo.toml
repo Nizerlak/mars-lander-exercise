@@ -1,6 +1,6 @@
 [package]
 name = "mars-lander-exercise"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -10,8 +10,11 @@ name="simulation"
 path="src/lib.rs"
 
 [dependencies]
-json = "0.12.4"
+# common
 rand = "0.8"
+
+# GUI
+json = "0.12.4"
 axum = "0.7.4"
 tokio = { version = "1.35.1", features = ["full"] }
 tower = "0.4.13"

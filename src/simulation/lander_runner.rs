@@ -125,8 +125,8 @@ impl LanderRunner {
         if picked_any {
             if let Some(ref mut exectuions_left) = self.executions_left {
                 *exectuions_left -= 1;
-                self.iteration_id += 1;
             }
+            self.iteration_id += 1;
             Ok(ExecutionStatus::InProgress)
         } else {
             Ok(ExecutionStatus::Finished)

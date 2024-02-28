@@ -1,9 +1,10 @@
 use std::ops::RangeInclusive;
 
-use rand::Rng;
+use rand::{seq::SliceRandom, Rng};
 
 type Angle = i32;
 type Thrust = i32;
+type Point = (f64, f64);
 
 const ANGLE_RANGE: RangeInclusive<Angle> = -90..=90;
 const THRUST_RANGE: RangeInclusive<Thrust> = 0..=4;
@@ -18,12 +19,37 @@ pub trait CommandProvider {
 }
 
 pub struct Settings {
-    pub num_of_runners: usize,
+    pub population_size: usize,
+    pub chromosome_size: usize,
+    pub elitism: f64,
+    pub mutation_prob: f64,
+    pub landing_bias: f64,
 }
 
+pub struct SolverSettings {
+    pub population_size: usize,
+    pub chromosome_size: usize,
+    pub initial_angle: i32,
+    pub initial_thrust: i32,
+    pub elitism: f64,
+    pub mutation_prob: f64,
+}
+
+#[derive(Clone,Debug)]
 struct Chromosome {
     angles: AngleGenes,
     thrusts: ThrustGenes,
+}
+
+pub struct Solver {
+    population: Vec<Chromosome>,
+    elitism: f64,
+    mutation_prob: f64,
+}
+
+pub struct FitnessCalculator {
+    target: ((f64, f64), f64),
+    landing_bias: f64,
 }
 
 fn new_random_angle(angle: Angle) -> Angle {
@@ -55,6 +81,12 @@ fn crossed(a: &Vec<i32>, b: &Vec<i32>, i: usize) -> Option<(Vec<i32>, Vec<i32>)>
     x.extend(&b[i..]);
     y.extend(&a[i..]);
     Some((x, y))
+}
+
+fn normalized(v: impl Iterator<Item = f64> + Clone) -> Option<impl Iterator<Item = f64>> {
+    let max = v.clone().map(|v| v.abs()).max_by(|a, b| a.total_cmp(b))?;
+    let max = if max == 0. { 1. } else { max };
+    Some(v.map(move |v| v / max))
 }
 
 impl Chromosome {
@@ -107,26 +139,21 @@ impl Chromosome {
     }
 }
 
-pub struct Solver {
-    population: Vec<Chromosome>,
-}
-
 impl CommandProvider for Solver {
     fn get_cmd(&self, id: usize, sub_id: usize) -> Option<super::Thrust> {
         self.population.get(id)?.get_cmd(sub_id)
     }
 }
 
-pub struct SolverSettings {
-    pub population_size: usize,
-    pub chromosome_size: usize,
-    pub initial_angle: i32,
-    pub initial_thrust: i32,
-}
-
 impl Solver {
-    pub fn new(settings: SolverSettings) -> Self {
-        Self {
+    pub fn try_new(settings: SolverSettings) -> Result<Self, String> {
+        if settings.elitism < 0f64 || settings.elitism > 1f64 {
+            return Err(format!("Elitism ({}) out of range [0,1]", settings.elitism));
+        }
+        if settings.mutation_prob < 0f64 || settings.mutation_prob > 1f64 {
+            return Err(format!("MutationProb ({}) out of range [0,1]", settings.mutation_prob));
+        }
+        Ok(Self {
             population: (0..settings.population_size).fold(Vec::new(), |mut population, _| {
                 population.push(Chromosome::new_random(
                     settings.chromosome_size,
@@ -135,34 +162,58 @@ impl Solver {
                 ));
                 population
             }),
-        }
+            elitism: settings.elitism,
+            mutation_prob: settings.mutation_prob,
+        })
+    }
+
+    pub fn new_generation(&mut self, fitness: impl Iterator<Item = f64>) -> Option<()> {
+        let len_population_before = self.population.len();
+        let parents = self.choose_parents(fitness);
+        self.population = self.breed_parents(parents)?;
+        assert_eq!(len_population_before, self.population.len());
+        self.mutate();
+        Some(())
+    }
+
+    fn choose_parents(&self, fitness: impl Iterator<Item = f64>) -> Vec<&Chromosome> {
+        let mut ranking = self.population.iter().zip(fitness).collect::<Vec<_>>();
+        ranking.sort_by(|(_, fitness1), (_, fitness2)| fitness1.total_cmp(fitness2));
+
+        let n_best = (self.elitism * self.population.len() as f64) as usize;
+        ranking[..n_best].iter().map(|(c, _)| *c).collect()
+    }
+
+    fn breed_parents(&self, parents: Vec<&Chromosome>) -> Option<Vec<Chromosome>> {
+        let n_children = self.population.len() - parents.len();
+        let mut new_population =
+            (0..n_children/2).try_fold(Vec::new(), |mut new_population, _| {
+                let mut r = parents.choose_multiple(&mut rand::thread_rng(), 2);
+                let parent1 = r.next()?;
+                let parent2 = r.next()?;
+                let (c1, c2) =
+                    parent1.crossover(&parent2, rand::thread_rng().gen_range(0f64..1f64))?;
+                new_population.push(c1);
+                new_population.push(c2);
+                Some(new_population)
+            })?;
+        new_population.extend(parents.iter().map(|c| (**c).clone()));
+        Some(new_population)
+    }
+
+    fn mutate(&mut self) {
+        self.population.iter_mut().for_each(|c|
+        if rand::thread_rng().gen_range(0f64..1f64) <= self.mutation_prob{
+            c.mutate(rand::thread_rng().gen_range(0f64..1f64));
+        })
     }
 }
 
-struct FitnessCalculator {
-    target: ((f64, f64), f64),
-    landing_bias: f64,
-}
-
-type Point = (f64, f64);
-
-fn normalized(v: impl Iterator<Item = f64> + Clone) -> Option<impl Iterator<Item = f64>> {
-    let max = v.clone().map(|v| v.abs()).max_by(|a, b| a.total_cmp(b))?;
-    let max = if max == 0. { 1. } else { max };
-    Some(v.map(move |v| v / max))
-}
-
 impl FitnessCalculator {
-    fn dist_to_target(&self, (x, y): Point) -> f64 {
-        let ((tx1, tx2), ty) = &self.target;
-        let dist =
-            |(a1, a2): Point, (b1, b2): Point| ((a1 - a2).powi(2) + (b1 - b2).powi(2)).sqrt();
-        if x < *tx1 {
-            dist((x, y), (*tx1, *ty))
-        } else if x > *tx2 {
-            dist((x, y), (*tx2, *ty))
-        } else {
-            (ty - y).abs()
+    pub fn new(target: ((f64, f64), f64), landing_bias: f64) -> Self {
+        Self {
+            target,
+            landing_bias,
         }
     }
 
@@ -202,6 +253,19 @@ impl FitnessCalculator {
                 })
                 .collect(),
         )
+    }
+
+    fn dist_to_target(&self, (x, y): Point) -> f64 {
+        let ((tx1, tx2), ty) = &self.target;
+        let dist =
+            |(a1, a2): Point, (b1, b2): Point| ((a1 - a2).powi(2) + (b1 - b2).powi(2)).sqrt();
+        if x < *tx1 {
+            dist((x, y), (*tx1, *ty))
+        } else if x > *tx2 {
+            dist((x, y), (*tx2, *ty))
+        } else {
+            (ty - y).abs()
+        }
     }
 }
 

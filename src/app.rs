@@ -1,61 +1,78 @@
 use crate::{init, simulation::*};
-use rand::Rng;
-
-struct DummyCommandProvider {}
-
-impl CommandProvider for DummyCommandProvider {
-    fn get_cmd(&self, _: usize, _: usize) -> Option<Thrust> {
-        Some(Thrust::new(-55., 2 + rand::thread_rng().gen_range(0..=1)))
-    }
-}
 
 pub struct App {
     terrain: Terrain,
     lander_runner: LanderRunner,
     initial_lander_state: LanderState,
     flight_histories: Vec<LanderHistory>,
-    cmd_provider: DummyCommandProvider,
+    solver: Solver,
+    fitness_calculator: FitnessCalculator,
 }
 
 impl App {
     pub fn try_new(sim_file_path: String, settings_file_path: String) -> Result<Self, String> {
         let (initial_lander_state, terrain) = init::json::parse_sim(sim_file_path)?;
         let settings = init::json::parse_settings(settings_file_path)?;
+        let solver_settings = SolverSettings {
+            chromosome_size: settings.chromosome_size,
+            elitism: settings.elitism,
+            mutation_prob: settings.mutation_prob,
+            population_size: settings.population_size,
+            initial_angle: initial_lander_state.angle as i32,
+            initial_thrust: initial_lander_state.power,
+        };
+        let solver = Solver::try_new(solver_settings)?;
+        let fitness_calculator = FitnessCalculator::new(
+            Self::target_from_terrain(&terrain).ok_or("Cannot get target from terrain")?,
+            settings.landing_bias,
+        );
         let lander_runner = LanderRunner::new(
             initial_lander_state.clone(),
-            settings.num_of_runners,
+            settings.population_size,
             Physics::default(),
             CollisionChecker::default(),
         );
         let flight_histories: Vec<_> =
             vec![
                 LanderHistory::with_initial_state(initial_lander_state.clone());
-                settings.num_of_runners
+                settings.population_size
             ];
-        let cmd_provider = DummyCommandProvider {};
 
         Ok(Self {
             terrain,
             lander_runner,
             initial_lander_state,
             flight_histories,
-            cmd_provider,
+            solver,
+            fitness_calculator,
         })
     }
 
-    pub fn reset(&mut self) {
+    pub fn reset(&mut self) ->Option<()>{
+        let fitness = self.fitness_calculator.calculate_fitness(
+            &self.lander_runner
+                .current_landers_states()
+                .map(|l| (l.x, l.y)).collect(),
+            &self.lander_runner.current_flight_states().map(|f|if let FlightState::Landed(l)=f{
+                Some(l.clone())
+            }else{
+                None
+            }).collect::<Option<Vec<_>>>()?,
+        )?;
+        self.solver.new_generation(fitness.into_iter())?;
         self.lander_runner
             .reinitialize(self.initial_lander_state.clone());
         self.flight_histories.iter_mut().for_each(|h| {
             *h = LanderHistory::with_initial_state(self.initial_lander_state.clone())
         });
+        Some(())
     }
 
     pub fn run(&mut self) -> Result<ExecutionStatus, String> {
         let res = loop {
             match self
                 .lander_runner
-                .iterate(&self.cmd_provider, &self.terrain)
+                .iterate(&self.solver, &self.terrain)
                 .map_err(|e| e.to_string())
             {
                 Ok(ExecutionStatus::InProgress) => self.save_last_lander_states_in_flight(),
@@ -71,12 +88,25 @@ impl App {
     }
 
     pub fn get_current_states(&self) -> impl Iterator<Item = &FlightState> + '_ {
-        self.lander_runner
-            .current_flight_states()
+        self.lander_runner.current_flight_states()
     }
 
     pub fn get_terrain(&self) -> &Terrain {
         &self.terrain
+    }
+
+    fn target_from_terrain(terrain: &Terrain) -> Option<((f64, f64), f64)> {
+        for (x, y) in terrain
+            .x
+            .as_slice()
+            .windows(2)
+            .zip(terrain.y.as_slice().windows(2))
+        {
+            if y[0] == y[1] {
+                return Some(((x[0], x[1]), y[0]));
+            }
+        }
+        None
     }
 
     fn save_last_lander_states_in_flight(&mut self) {

@@ -30,9 +30,14 @@ macro_rules! json_value_or_err {
 pub fn parse_settings(settings_file_path: String) -> Result<Settings, String> {
     let settings_json = read_json(settings_file_path)?;
 
-    Ok(Settings {
-        num_of_runners: get_json!(settings_json, "NumOfRunners", as_usize),
-    })
+    let settings = Settings {
+        population_size: get_json!(settings_json, "PopulationSize", as_usize),
+        chromosome_size: get_json!(settings_json, "ChromosomeSize", as_usize),
+        elitism: get_json!(settings_json, "Elitism", as_f64),
+        mutation_prob: get_json!(settings_json, "MutationProb", as_f64),
+        landing_bias: get_json!(settings_json, "LandingBias", as_f64),
+    };
+    Ok(settings)
 }
 
 pub fn parse_sim(sim_file_path: String) -> Result<(LanderState, Terrain), String> {

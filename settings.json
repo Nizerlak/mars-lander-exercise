@@ -1,3 +1,7 @@
 {
-    "NumOfRunners" : 10000
+    "PopulationSize": 200,
+    "ChromosomeSize": 150,
+    "Elitism": 0.2,
+    "MutationProb": 0.01,
+    "LandingBias": 0.5
 }

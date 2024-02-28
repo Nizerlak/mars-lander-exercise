@@ -7,6 +7,7 @@ pub struct App {
     flight_histories: Vec<LanderHistory>,
     solver: Solver,
     fitness_calculator: FitnessCalculator,
+    population_id: usize
 }
 
 impl App {
@@ -45,10 +46,11 @@ impl App {
             flight_histories,
             solver,
             fitness_calculator,
+            population_id: 0,
         })
     }
 
-    pub fn reset(&mut self) ->Option<()>{
+    pub fn next_population(&mut self) ->Option<()>{
         let fitness = self.fitness_calculator.calculate_fitness(
             &self.lander_runner
                 .current_landers_states()
@@ -65,6 +67,7 @@ impl App {
         self.flight_histories.iter_mut().for_each(|h| {
             *h = LanderHistory::with_initial_state(self.initial_lander_state.clone())
         });
+        self.population_id += 1;
         Some(())
     }
 
@@ -93,6 +96,10 @@ impl App {
 
     pub fn get_terrain(&self) -> &Terrain {
         &self.terrain
+    }
+
+    pub fn get_population_id(&self) -> usize{
+        self.population_id
     }
 
     fn target_from_terrain(terrain: &Terrain) -> Option<((f64, f64), f64)> {

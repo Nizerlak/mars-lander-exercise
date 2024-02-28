@@ -54,6 +54,12 @@ struct Route {
     flight_state: FlightState,
 }
 
+#[derive(Serialize)]
+struct Population{
+    id: usize,
+    routes: Vec<Route>,
+}
+
 #[derive(Clone)]
 struct AppState {
     state: Arc<Mutex<App>>,
@@ -76,7 +82,7 @@ async fn main() {
     // build our application with a single route
     let router = Router::new()
         .route("/terrain", get(handle_terrain))
-        .route("/routes", get(handle_routes))
+        .route("/next", get(handle_next))
         .with_state(app)
         .layer(CorsLayer::permissive());
 
@@ -97,16 +103,20 @@ async fn handle_terrain(State(state): State<AppState>) -> Json<Value> {
     Json(serde_json::to_value(v).unwrap())
 }
 
-async fn handle_routes(State(state): State<AppState>) -> Json<Value> {
+async fn handle_next(State(state): State<AppState>) -> Json<Value> {
     let mut app = state.state.lock().unwrap();
-    app.reset();
+    app.next_population();
     let _ = app.run();
     let routes = app
         .get_routes()
         .zip(app.get_current_states())
         .map(lander_states_to_route)
         .collect::<Vec<_>>();
-    Json(serde_json::to_value(routes).unwrap())
+    let population = Population{
+        id: app.get_population_id(),
+        routes
+    };
+    Json(serde_json::to_value(population).unwrap())
 }
 
 fn lander_states_to_route(

@@ -3,7 +3,7 @@ pub use crate::simulation::*;
 #[derive(Debug)]
 pub enum Error {
     InconsistentState,
-    CommandGetError { id: usize },
+    CommandGetError { id: usize, sub_id: usize },
     SimulationError(SimulationError),
 }
 
@@ -68,6 +68,7 @@ impl LanderRunner {
     pub fn reinitialize(&mut self, initial_lander_state: LanderState) {
         self.states = vec![FlightState::Flying; self.num_of_landers()];
         self.landers = vec![initial_lander_state; self.num_of_landers()];
+        self.iteration_id = 0;
     }
 
     pub fn num_of_landers(&self) -> usize {
@@ -105,7 +106,7 @@ impl LanderRunner {
                 picked_any = true;
                 let cmd = command_provider
                     .get_cmd(id, self.iteration_id)
-                    .ok_or(Error::CommandGetError { id })?;
+                    .ok_or(Error::CommandGetError { id, sub_id: self.iteration_id })?;
                 let mut new_lander_state = self
                     .physics
                     .iterate(lander.clone(), cmd)

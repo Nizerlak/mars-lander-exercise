@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use axum::{extract::State, response::Json, routing::get, Router};
+use axum::{extract::State, http::StatusCode, response::Json, routing::get, Router};
 use serde::Serialize;
 use serde_json::Value;
 use simulation::{App, LanderState};
@@ -38,9 +38,9 @@ impl From<&simulation::FlightState> for FlightState {
             FS::Landed(landing) => match landing {
                 L::Correct => Self::LandedCorrectly,
                 L::WrongTerrain => Self::CrashedWrongTerrain,
-                L::NotVertical{error: _} => Self::CrashedNotVertical,
-                L::TooFastVertical{error: _} => Self::CrashedTooFastVertical,
-                L::TooFastHorizontal{error: _} => Self::CrashedTooFastHorizontal,
+                L::NotVertical { error: _ } => Self::CrashedNotVertical,
+                L::TooFastVertical { error: _ } => Self::CrashedTooFastVertical,
+                L::TooFastHorizontal { error: _ } => Self::CrashedTooFastHorizontal,
                 L::OutOfMap => Self::OutOfMap,
             },
         }
@@ -55,7 +55,7 @@ struct Route {
 }
 
 #[derive(Serialize)]
-struct Population{
+struct Population {
     id: usize,
     routes: Vec<Route>,
 }
@@ -78,6 +78,7 @@ async fn main() {
         },
         Err(e) => panic!("{e}"),
     };
+    app.state.lock().unwrap().run().unwrap();
 
     // build our application with a single route
     let router = Router::new()
@@ -103,20 +104,26 @@ async fn handle_terrain(State(state): State<AppState>) -> Json<Value> {
     Json(serde_json::to_value(v).unwrap())
 }
 
-async fn handle_next(State(state): State<AppState>) -> Json<Value> {
+async fn handle_next(State(state): State<AppState>) -> Result<Json<Value>, StatusCode> {
     let mut app = state.state.lock().unwrap();
-    app.next_population();
-    let _ = app.run();
+    app.next_population().map_err(|e: String| {
+        eprintln!("App next population failed: {e}");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+    app.run().map_err(|e: String| {
+        eprintln!("App run failed: {e}");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
     let routes = app
         .get_routes()
         .zip(app.get_current_states())
         .map(lander_states_to_route)
         .collect::<Vec<_>>();
-    let population = Population{
+    let population = Population {
         id: app.get_population_id(),
-        routes
+        routes,
     };
-    Json(serde_json::to_value(population).unwrap())
+    Ok(Json(serde_json::to_value(population).unwrap()))
 }
 
 fn lander_states_to_route(

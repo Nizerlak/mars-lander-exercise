@@ -7,7 +7,7 @@ pub struct App {
     flight_histories: Vec<LanderHistory>,
     solver: Solver,
     fitness_calculator: FitnessCalculator,
-    population_id: usize
+    population_id: usize,
 }
 
 impl App {
@@ -50,17 +50,25 @@ impl App {
         })
     }
 
-    pub fn next_population(&mut self) ->Option<()>{
+    pub fn next_population(&mut self) -> Result<(), String> {
         let fitness = self.fitness_calculator.calculate_fitness(
-            &self.lander_runner
+            &self
+                .lander_runner
                 .current_landers_states()
-                .map(|l| (l.x, l.y)).collect(),
-            &self.lander_runner.current_flight_states().map(|f|if let FlightState::Landed(l)=f{
-                Some(l.clone())
-            }else{
-                None
-            }).collect::<Option<Vec<_>>>()?,
-        )?;
+                .map(|l| (l.x, l.y))
+                .collect(),
+            &self
+                .lander_runner
+                .current_flight_states()
+                .map(|f| {
+                    if let FlightState::Landed(l) = f {
+                        Ok(l.clone())
+                    } else {
+                        Err(format!("Lander not landed: {f:?}"))
+                    }
+                })
+                .collect::<Result<Vec<_>, String>>()?,
+        ).ok_or("Failed to calculate fitness")?;
         self.solver.new_generation(fitness.into_iter())?;
         self.lander_runner
             .reinitialize(self.initial_lander_state.clone());
@@ -68,7 +76,7 @@ impl App {
             *h = LanderHistory::with_initial_state(self.initial_lander_state.clone())
         });
         self.population_id += 1;
-        Some(())
+        Ok(())
     }
 
     pub fn run(&mut self) -> Result<ExecutionStatus, String> {
@@ -98,7 +106,7 @@ impl App {
         &self.terrain
     }
 
-    pub fn get_population_id(&self) -> usize{
+    pub fn get_population_id(&self) -> usize {
         self.population_id
     }
 

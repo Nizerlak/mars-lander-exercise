@@ -35,7 +35,7 @@ pub struct SolverSettings {
     pub mutation_prob: f64,
 }
 
-#[derive(Clone,Debug)]
+#[derive(Clone, Debug)]
 struct Chromosome {
     angles: AngleGenes,
     thrusts: ThrustGenes,
@@ -70,17 +70,17 @@ fn clamp(v: i32, range: RangeInclusive<i32>) -> i32 {
     *range.start().max(range.end().min(&v))
 }
 
-fn crossed(a: &Vec<i32>, b: &Vec<i32>, i: usize) -> Option<(Vec<i32>, Vec<i32>)> {
+fn crossed(a: &Vec<i32>, b: &Vec<i32>, i: usize) -> Result<(Vec<i32>, Vec<i32>), String> {
     if a.len() != b.len() {
-        return None;
+        return Err(format!("a.len() != b.len() ({} != {})", a.len(), b.len()));
     } else if i >= a.len() {
-        return None;
+        return Err(format!("i >= a.len() ({} >= {})", i, b.len()));
     }
 
     let (mut x, mut y) = (a[..i].to_vec(), b[..i].to_vec());
     x.extend(&b[i..]);
     y.extend(&a[i..]);
-    Some((x, y))
+    Ok((x, y))
 }
 
 fn normalized(v: impl Iterator<Item = f64> + Clone) -> Option<impl Iterator<Item = f64>> {
@@ -113,11 +113,13 @@ impl Chromosome {
         ))
     }
 
-    pub fn crossover(&self, other: &Self, cross_point: f64) -> Option<(Self, Self)> {
+    pub fn crossover(&self, other: &Self, cross_point: f64) -> Result<(Self, Self), String> {
         let i = (cross_point * self.angles.len() as f64) as usize;
-        let (angles_a, angles_b) = crossed(&self.angles, &other.angles, i)?;
-        let (thrusts_a, thrusts_b) = crossed(&self.thrusts, &other.thrusts, i)?;
-        Some((
+        let (angles_a, angles_b) = crossed(&self.angles, &other.angles, i)
+            .map_err(|e| format!("Failed to cross angles, cross point: {cross_point}\n{e}"))?;
+        let (thrusts_a, thrusts_b) = crossed(&self.thrusts, &other.thrusts, i)
+            .map_err(|e| format!("Failed to cross thrusts, cross point: {cross_point}\n{e}"))?;
+        Ok((
             Self {
                 angles: angles_a,
                 thrusts: thrusts_a,
@@ -151,7 +153,10 @@ impl Solver {
             return Err(format!("Elitism ({}) out of range [0,1]", settings.elitism));
         }
         if settings.mutation_prob < 0f64 || settings.mutation_prob > 1f64 {
-            return Err(format!("MutationProb ({}) out of range [0,1]", settings.mutation_prob));
+            return Err(format!(
+                "MutationProb ({}) out of range [0,1]",
+                settings.mutation_prob
+            ));
         }
         Ok(Self {
             population: (0..settings.population_size).fold(Vec::new(), |mut population, _| {
@@ -167,13 +172,13 @@ impl Solver {
         })
     }
 
-    pub fn new_generation(&mut self, fitness: impl Iterator<Item = f64>) -> Option<()> {
+    pub fn new_generation(&mut self, fitness: impl Iterator<Item = f64>) -> Result<(), String> {
         let len_population_before = self.population.len();
         let parents = self.choose_parents(fitness);
         self.population = self.breed_parents(parents)?;
         assert_eq!(len_population_before, self.population.len());
         self.mutate();
-        Some(())
+        Ok(())
     }
 
     fn choose_parents(&self, fitness: impl Iterator<Item = f64>) -> Vec<&Chromosome> {
@@ -184,27 +189,28 @@ impl Solver {
         ranking[..n_best].iter().map(|(c, _)| *c).collect()
     }
 
-    fn breed_parents(&self, parents: Vec<&Chromosome>) -> Option<Vec<Chromosome>> {
+    fn breed_parents(&self, parents: Vec<&Chromosome>) -> Result<Vec<Chromosome>, String> {
         let n_children = self.population.len() - parents.len();
         let mut new_population =
-            (0..n_children/2).try_fold(Vec::new(), |mut new_population, _| {
+            (0..n_children / 2).try_fold(Vec::new(), |mut new_population, _| {
                 let mut r = parents.choose_multiple(&mut rand::thread_rng(), 2);
-                let parent1 = r.next()?;
-                let parent2 = r.next()?;
+                let parent1 = r.next().ok_or("Can't get parent1")?;
+                let parent2 = r.next().ok_or("Can't get parent2")?;
                 let (c1, c2) =
                     parent1.crossover(&parent2, rand::thread_rng().gen_range(0f64..1f64))?;
                 new_population.push(c1);
                 new_population.push(c2);
-                Some(new_population)
+                Ok::<Vec<_>, String>(new_population)
             })?;
         new_population.extend(parents.iter().map(|c| (**c).clone()));
-        Some(new_population)
+        Ok(new_population)
     }
 
     fn mutate(&mut self) {
-        self.population.iter_mut().for_each(|c|
-        if rand::thread_rng().gen_range(0f64..1f64) <= self.mutation_prob{
-            c.mutate(rand::thread_rng().gen_range(0f64..1f64));
+        self.population.iter_mut().for_each(|c| {
+            if rand::thread_rng().gen_range(0f64..1f64) <= self.mutation_prob {
+                c.mutate(rand::thread_rng().gen_range(0f64..1f64));
+            }
         })
     }
 }
@@ -277,21 +283,21 @@ mod crossing_test {
     fn different_vecs() {
         let a = vec![1, 2, 3];
         let b = vec![4, 5];
-        assert!(crossed(&a, &b, 2).is_none());
+        assert!(crossed(&a, &b, 2).is_err());
     }
 
     #[test]
     fn wrong_i1() {
         let a = vec![1, 2, 3];
         let b = vec![4, 5, 6];
-        assert!(crossed(&a, &b, 3).is_none());
+        assert!(crossed(&a, &b, 3).is_err());
     }
 
     #[test]
     fn wrong_i2() {
         let a = vec![1, 2, 3];
         let b = vec![4, 5, 6];
-        assert!(crossed(&a, &b, 4).is_none());
+        assert!(crossed(&a, &b, 4).is_err());
     }
 
     #[test]

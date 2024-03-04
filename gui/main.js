@@ -13,11 +13,26 @@ ctx.canvas.height = maxY * scaling;
 var nextButton = document.getElementById("next_button");
 nextButton.onclick = async () => {
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-    draw_terrain();
-    draw_population();
+    drawTerrain();
+    drawPopulation();
 };
 
-function draw_terrain() {
+function printStats(population) {
+    const routes_sizes = Array.from(population['routes'], (r) => r['positions'].length);
+    const mean = routes_sizes.reduce((accumulator, currentValue) => accumulator + currentValue, 0) / routes_sizes.length;
+    const stats = {
+        "population size": population['routes'].length,
+        "route sizes": {
+            "max": Math.max(...routes_sizes),
+            "min": Math.min(...routes_sizes),
+            "mean": mean,
+        }
+    };
+    document.getElementById("stats").value = JSON.stringify(stats);
+
+}
+
+function drawTerrain() {
     fetch('http://0.0.0.0:3000/terrain')
         .then(async (response) => {
             console.log("Got terrain");
@@ -25,7 +40,7 @@ function draw_terrain() {
         });
 }
 
-function draw_population() {
+function drawPopulation() {
     fetch('http://0.0.0.0:3000/next')
         .then(async (response) => {
             console.log("Got next population");
@@ -36,6 +51,7 @@ function draw_population() {
             ctx.fillStyle = "white";
             ctx.font = "30px serif";
             ctx.fillText("Population id: " + population['id'], 10, 32);
+            printStats(population);
         });
 }
 

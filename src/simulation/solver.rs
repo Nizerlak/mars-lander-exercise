@@ -11,6 +11,12 @@ const THRUST_RANGE: RangeInclusive<Thrust> = 0..=4;
 const ANGLE_STEP_RANGE: RangeInclusive<Angle> = -15..=15;
 const THRUST_STEP_RANGE: RangeInclusive<Thrust> = -1..=1;
 
+macro_rules! clamp {
+    ($range:ident) => {
+        |x| clamp(x, $range)
+    };
+}
+
 type AngleGenes = Vec<Angle>;
 type ThrustGenes = Vec<Thrust>;
 
@@ -45,6 +51,9 @@ pub struct Solver {
     population: Vec<Chromosome>,
     elitism: f64,
     mutation_prob: f64,
+    initial_angle: Angle,
+    initial_thrust: Thrust,
+    accumulated_population: Vec<Chromosome>,
 }
 
 pub struct FitnessCalculator {
@@ -52,34 +61,42 @@ pub struct FitnessCalculator {
     landing_bias: f64,
 }
 
-fn new_random_angle(angle: Angle) -> Angle {
-    clamp(
-        angle + rand::thread_rng().gen_range(ANGLE_STEP_RANGE),
-        ANGLE_RANGE,
-    )
+fn new_random_angle() -> Angle {
+    rand::thread_rng().gen_range(ANGLE_STEP_RANGE)
 }
 
-fn new_random_thrust(thrust: Thrust) -> Thrust {
-    clamp(
-        thrust + rand::thread_rng().gen_range(THRUST_STEP_RANGE),
-        THRUST_RANGE,
-    )
+fn new_random_thrust() -> Thrust {
+    rand::thread_rng().gen_range(THRUST_STEP_RANGE)
 }
 
 fn clamp(v: i32, range: RangeInclusive<i32>) -> i32 {
     *range.start().max(range.end().min(&v))
 }
 
-fn crossed(a: &Vec<i32>, b: &Vec<i32>, i: usize) -> Result<(Vec<i32>, Vec<i32>), String> {
+fn crossed(
+    a: &Vec<i32>,
+    b: &Vec<i32>,
+    i: f64,
+    clamp: impl Fn(i32) -> i32,
+) -> Result<(Vec<i32>, Vec<i32>), String> {
     if a.len() != b.len() {
         return Err(format!("a.len() != b.len() ({} != {})", a.len(), b.len()));
-    } else if i >= a.len() {
-        return Err(format!("i >= a.len() ({} >= {})", i, b.len()));
+    } else if i > 1f64 || i < 0f64 {
+        return Err(format!("i out of range [0,1], i={i}"));
     }
 
-    let (mut x, mut y) = (a[..i].to_vec(), b[..i].to_vec());
-    x.extend(&b[i..]);
-    y.extend(&a[i..]);
+    let (x, y) = a
+        .iter()
+        .zip(b)
+        .fold((Vec::new(), Vec::new()), |(mut x, mut y), (a, b)| {
+            let a = *a as f64;
+            let b = *b as f64;
+            let xp = (i * a + (1f64 - i) * b).round() as i32;
+            let yp = (i * b + (1f64 - i) * a).round() as i32;
+            x.push(clamp(xp));
+            y.push(clamp(yp));
+            (x, y)
+        });
     Ok((x, y))
 }
 
@@ -89,21 +106,23 @@ fn normalized(v: impl Iterator<Item = f64> + Clone) -> Option<impl Iterator<Item
     Some(v.map(move |v| v / max))
 }
 
+fn accumulated(
+    initial_value: i32,
+    i: impl Iterator<Item = i32>,
+    clamp: impl Fn(i32) -> i32,
+) -> impl Iterator<Item = i32> {
+    i.scan(initial_value, move |value, o| {
+        *value = clamp(*value + o);
+        Some(*value)
+    })
+}
+
 impl Chromosome {
-    pub fn new_random(size: usize, initial_angle: Angle, initial_thrust: Thrust) -> Self {
-        (0..size - 1).fold(
-            Self {
-                angles: vec![new_random_angle(initial_angle)],
-                thrusts: vec![new_random_thrust(initial_thrust)],
-            },
-            |mut s, _| {
-                let new_angle = new_random_angle(*s.angles.last().unwrap());
-                let new_thrust = new_random_thrust(*s.thrusts.last().unwrap());
-                s.angles.push(new_angle);
-                s.thrusts.push(new_thrust);
-                s
-            },
-        )
+    pub fn new_random(size: usize) -> Self {
+        Self {
+            angles: (0..size).map(|_| new_random_angle()).collect(),
+            thrusts: (0..size).map(|_| new_random_thrust()).collect(),
+        }
     }
 
     pub fn get_cmd(&self, id: usize) -> Option<super::Thrust> {
@@ -114,11 +133,20 @@ impl Chromosome {
     }
 
     pub fn crossover(&self, other: &Self, cross_point: f64) -> Result<(Self, Self), String> {
-        let i = (cross_point * self.angles.len() as f64) as usize;
-        let (angles_a, angles_b) = crossed(&self.angles, &other.angles, i)
-            .map_err(|e| format!("Failed to cross angles, cross point: {cross_point}\n{e}"))?;
-        let (thrusts_a, thrusts_b) = crossed(&self.thrusts, &other.thrusts, i)
-            .map_err(|e| format!("Failed to cross thrusts, cross point: {cross_point}\n{e}"))?;
+        let (angles_a, angles_b) = crossed(
+            &self.angles,
+            &other.angles,
+            cross_point,
+            clamp!(ANGLE_STEP_RANGE),
+        )
+        .map_err(|e| format!("Failed to cross angles, cross point: {cross_point}\n{e}"))?;
+        let (thrusts_a, thrusts_b) = crossed(
+            &self.thrusts,
+            &other.thrusts,
+            cross_point,
+            clamp!(THRUST_STEP_RANGE),
+        )
+        .map_err(|e| format!("Failed to cross thrusts, cross point: {cross_point}\n{e}"))?;
         Ok((
             Self {
                 angles: angles_a,
@@ -131,19 +159,23 @@ impl Chromosome {
         ))
     }
 
-    pub fn mutate(&mut self, mutation_point: f64) -> Option<()> {
-        let i = (mutation_point * self.angles.len() as f64) as usize;
-        let new_angle = new_random_angle(*self.angles.get(i)?);
-        let new_thrust = new_random_thrust(*self.angles.get(i)?);
-        self.angles[i] = new_angle;
-        self.thrusts[i] = new_thrust;
+    pub fn mutate(&mut self, mutation_prob: f64) -> Option<()> {
+        self.angles
+            .iter_mut()
+            .zip(self.thrusts.iter_mut())
+            .for_each(|(angle, thrust)| {
+                if rand::thread_rng().gen_range(0f64..1f64) < mutation_prob {
+                    *angle = clamp(new_random_angle(), ANGLE_STEP_RANGE);
+                    *thrust = clamp(new_random_thrust(), THRUST_STEP_RANGE);
+                }
+            });
         Some(())
     }
 }
 
 impl CommandProvider for Solver {
     fn get_cmd(&self, id: usize, sub_id: usize) -> Option<super::Thrust> {
-        self.population.get(id)?.get_cmd(sub_id)
+        self.accumulated_population.get(id)?.get_cmd(sub_id)
     }
 }
 
@@ -158,24 +190,33 @@ impl Solver {
                 settings.mutation_prob
             ));
         }
+        let population: Vec<_> = (0..settings.population_size)
+            .map(|_| Chromosome::new_random(settings.chromosome_size))
+            .collect();
+        let accumulated_population = Self::accumulated_population(
+            settings.initial_angle,
+            settings.initial_thrust,
+            &population,
+        );
         Ok(Self {
-            population: (0..settings.population_size).fold(Vec::new(), |mut population, _| {
-                population.push(Chromosome::new_random(
-                    settings.chromosome_size,
-                    settings.initial_angle,
-                    settings.initial_thrust,
-                ));
-                population
-            }),
+            population,
             elitism: settings.elitism,
             mutation_prob: settings.mutation_prob,
+            initial_angle: settings.initial_angle,
+            initial_thrust: settings.initial_thrust,
+            accumulated_population,
         })
     }
 
     pub fn new_generation(&mut self, fitness: impl Iterator<Item = f64>) -> Result<(), String> {
         let len_population_before = self.population.len();
         let parents = self.choose_parents(fitness);
-        self.population = self.breed_parents(parents)?;
+        let n_children = len_population_before - parents.len();
+        let mut new_pop = self.mate(self.population.iter().collect(), n_children)?;
+        new_pop.extend(parents.iter().map(|c| (**c).clone()));
+        self.population = new_pop;
+        self.accumulated_population =
+            Self::accumulated_population(self.initial_angle, self.initial_thrust, &self.population);
         assert_eq!(len_population_before, self.population.len());
         self.mutate();
         Ok(())
@@ -189,9 +230,12 @@ impl Solver {
         ranking[..n_best].iter().map(|(c, _)| *c).collect()
     }
 
-    fn breed_parents(&self, parents: Vec<&Chromosome>) -> Result<Vec<Chromosome>, String> {
-        let n_children = self.population.len() - parents.len();
-        let mut new_population =
+    fn mate(
+        &self,
+        parents: Vec<&Chromosome>,
+        n_children: usize,
+    ) -> Result<Vec<Chromosome>, String> {
+        let new_population =
             (0..n_children / 2).try_fold(Vec::new(), |mut new_population, _| {
                 let mut r = parents.choose_multiple(&mut rand::thread_rng(), 2);
                 let parent1 = r.next().ok_or("Can't get parent1")?;
@@ -202,16 +246,36 @@ impl Solver {
                 new_population.push(c2);
                 Ok::<Vec<_>, String>(new_population)
             })?;
-        new_population.extend(parents.iter().map(|c| (**c).clone()));
         Ok(new_population)
     }
 
     fn mutate(&mut self) {
         self.population.iter_mut().for_each(|c| {
-            if rand::thread_rng().gen_range(0f64..1f64) <= self.mutation_prob {
-                c.mutate(rand::thread_rng().gen_range(0f64..1f64));
-            }
+            c.mutate(self.mutation_prob);
         })
+    }
+
+    fn accumulated_population(
+        initial_angle: i32,
+        initial_thrust: i32,
+        population: &Vec<Chromosome>,
+    ) -> Vec<Chromosome> {
+        population.iter().fold(
+            Vec::new(),
+            |mut population, Chromosome { angles, thrusts }| {
+                population.push(Chromosome {
+                    angles: accumulated(initial_angle, angles.iter().copied(), clamp!(ANGLE_RANGE))
+                        .collect(),
+                    thrusts: accumulated(
+                        initial_thrust,
+                        thrusts.iter().copied(),
+                        clamp!(THRUST_RANGE),
+                    )
+                    .collect(),
+                });
+                population
+            },
+        )
     }
 }
 
@@ -237,7 +301,7 @@ impl FitnessCalculator {
             self.landing_bias + (1. - self.landing_bias) * error / max.unwrap()
         };
 
-        let (nv, tfh, tfv) =
+        let (nv_max, tfh_max, tfv_max) =
             landing_results
                 .iter()
                 .fold((None, None, None), |(a, b, c), landing| match landing {
@@ -252,9 +316,9 @@ impl FitnessCalculator {
                 .zip(distances)
                 .map(|(result, dist_points)| match result {
                     &Landing::Correct => 1.,
-                    &Landing::NotVertical { error } => landed_normalized(error, nv),
-                    &Landing::TooFastHorizontal { error } => landed_normalized(error, tfh),
-                    &Landing::TooFastVertical { error } => landed_normalized(error, tfv),
+                    &Landing::NotVertical { error } => landed_normalized(error, nv_max),
+                    &Landing::TooFastHorizontal { error } => landed_normalized(error, tfh_max),
+                    &Landing::TooFastVertical { error } => landed_normalized(error, tfv_max),
                     &Landing::WrongTerrain | &Landing::OutOfMap => dist_points * self.landing_bias,
                 })
                 .collect(),
@@ -279,42 +343,85 @@ impl FitnessCalculator {
 mod crossing_test {
     use super::crossed;
 
+    fn pass(x: i32) -> i32 {
+        x
+    }
+
     #[test]
     fn different_vecs() {
         let a = vec![1, 2, 3];
         let b = vec![4, 5];
-        assert!(crossed(&a, &b, 2).is_err());
+        assert!(crossed(&a, &b, 0.5, pass).is_err());
     }
 
     #[test]
     fn wrong_i1() {
         let a = vec![1, 2, 3];
         let b = vec![4, 5, 6];
-        assert!(crossed(&a, &b, 3).is_err());
+        assert!(crossed(&a, &b, -0.5, pass).is_err());
     }
 
     #[test]
     fn wrong_i2() {
         let a = vec![1, 2, 3];
         let b = vec![4, 5, 6];
-        assert!(crossed(&a, &b, 4).is_err());
+        assert!(crossed(&a, &b, 1.5, pass).is_err());
     }
 
     #[test]
     fn crossing1() {
         let a1 = vec![1, 2, 3, 4];
         let b1 = vec![5, 6, 7, 8];
-        let (a2, b2) = crossed(&a1, &b1, 1).unwrap();
-        assert_eq!(a2, vec![1, 6, 7, 8]);
-        assert_eq!(b2, vec![5, 2, 3, 4]);
+        let (a2, b2) = crossed(&a1, &b1, 0.25, pass).unwrap();
+        assert_eq!(a2, vec![4, 5, 6, 7]);
+        assert_eq!(b2, vec![2, 3, 4, 5]);
     }
 
     #[test]
     fn crossing2() {
         let a1 = vec![1, 2, 3, 4];
         let b1 = vec![5, 6, 7, 8];
-        let (a2, b2) = crossed(&a1, &b1, 2).unwrap();
-        assert_eq!(a2, vec![1, 2, 7, 8]);
-        assert_eq!(b2, vec![5, 6, 3, 4]);
+        let (a2, b2) = crossed(&a1, &b1, 0.5, pass).unwrap();
+        assert_eq!(a2, vec![3, 4, 5, 6]);
+        assert_eq!(b2, vec![3, 4, 5, 6]);
+    }
+
+    #[test]
+    fn crossing_clamped() {
+        let a1 = vec![1, 2, 3, 4];
+        let b1 = vec![5, 6, 7, 8];
+        let (a2, b2) = crossed(&a1, &b1, 0.5, |x| x.min(4)).unwrap();
+        assert_eq!(a2, vec![3, 4, 4, 4]);
+        assert_eq!(b2, vec![3, 4, 4, 4]);
+    }
+}
+
+#[cfg(test)]
+mod accumulation_test {
+    use super::accumulated;
+
+    fn pass(x: i32) -> i32 {
+        x
+    }
+
+    #[test]
+    fn accumulate1() {
+        let a = vec![1, 1, 1, 1];
+        let a: Vec<_> = accumulated(0, a.iter().copied(), pass).collect();
+        assert_eq!(a, vec![1, 2, 3, 4]);
+    }
+
+    #[test]
+    fn accumulate2() {
+        let a = vec![1, 1, 1, 1];
+        let a: Vec<_> = accumulated(3, a.iter().copied(), pass).collect();
+        assert_eq!(a, vec![4, 5, 6, 7]);
+    }
+
+    #[test]
+    fn accumulate_clamped() {
+        let a = vec![1, 1, 1, 1];
+        let a: Vec<_> = accumulated(3, a.iter().copied(), |x| x.min(6)).collect();
+        assert_eq!(a, vec![4, 5, 6, 6]);
     }
 }

@@ -1,4 +1,5 @@
 mod app;
+mod error;
 pub mod init;
 mod simulation;
 

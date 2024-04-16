@@ -58,6 +58,7 @@ struct Route {
 struct Population {
     id: usize,
     routes: Vec<Route>,
+    fitness: Vec<f64>,
 }
 
 #[derive(Clone)]
@@ -122,6 +123,7 @@ async fn handle_next(State(state): State<AppState>) -> Result<Json<Value>, Statu
     let population = Population {
         id: app.get_population_id(),
         routes,
+        fitness: app.get_current_fitness().collect(),
     };
     Ok(Json(serde_json::to_value(population).unwrap()))
 }

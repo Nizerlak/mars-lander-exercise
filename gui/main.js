@@ -1,6 +1,35 @@
+import {
+    Grid,
+    html
+} from "https://unpkg.com/gridjs?module";
+
 console.log('hello world');
 var c = document.getElementById("myCanvas");
 var ctx = c.getContext("2d");
+
+const grid = new Grid({
+    columns: ["Id", "Fitness"],
+    data: [],
+    sort: true,
+    style: {
+        table: {
+            border: '3px solid #ccc'
+        },
+        th: {
+            'background-color': 'black',
+            color: 'white',
+            'border-bottom': '3px solid #ccc',
+            'text-align': 'center'
+        },
+        td: {
+            'background-color': 'black',
+            color: 'white',
+            'text-align': 'center',
+            'border': '1px solid #ccc',
+            'text-align': 'center'
+        }
+    }
+}).render(document.getElementById("wrapper"));
 
 const scaling = 0.2;
 const maxY = 3000;
@@ -52,6 +81,7 @@ function drawPopulation() {
             ctx.font = "30px serif";
             ctx.fillText("Population id: " + population['id'], 10, 32);
             printStats(population);
+            drawTable(population);
         });
 }
 
@@ -73,3 +103,9 @@ function drawLine(line, style = 'white') {
     ctx.closePath();
 }
 
+function drawTable(population) {
+    grid.updateConfig({
+        data: population.fitness.map((v, i) => [i, v]),
+        sort: true, check
+    }).forceRender();
+}

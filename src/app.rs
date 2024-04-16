@@ -7,6 +7,7 @@ pub struct App {
     flight_histories: Vec<LanderHistory>,
     solver: Solver,
     fitness_calculator: FitnessCalculator,
+    current_fitness: Vec<f64>,
     population_id: usize,
 }
 
@@ -46,6 +47,7 @@ impl App {
             flight_histories,
             solver,
             fitness_calculator,
+            current_fitness: vec![0f64; settings.population_size],
             population_id: 0,
         })
     }
@@ -69,12 +71,13 @@ impl App {
                 })
                 .collect::<Result<Vec<_>, String>>()?,
         ).ok_or("Failed to calculate fitness")?;
-        self.solver.new_generation(fitness.into_iter())?;
+        self.solver.new_generation(fitness.iter().copied())?;
         self.lander_runner
             .reinitialize(self.initial_lander_state.clone());
         self.flight_histories.iter_mut().for_each(|h| {
             *h = LanderHistory::with_initial_state(self.initial_lander_state.clone())
         });
+        self.current_fitness = fitness;
         self.population_id += 1;
         Ok(())
     }
@@ -96,6 +99,10 @@ impl App {
 
     pub fn get_routes(&self) -> impl Iterator<Item = impl Iterator<Item = LanderState> + '_> + '_ {
         self.flight_histories.iter().map(|h| h.iter_history())
+    }
+
+    pub fn get_current_fitness(&self) -> impl Iterator<Item = f64> + '_ {
+        self.current_fitness.iter().copied()
     }
 
     pub fn get_current_states(&self) -> impl Iterator<Item = &FlightState> + '_ {

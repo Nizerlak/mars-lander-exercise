@@ -61,19 +61,29 @@ function printStats(population) {
 
 }
 
+const BASE_URL = 'http://localhost:3000';
+
+async function fetchData(endpoint) {
+    const response = await fetch(`${BASE_URL}/${endpoint}`);
+    if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    return await response.json();
+}
+
 function drawTerrain() {
-    fetch('http://0.0.0.0:3000/terrain')
-        .then(async (response) => {
+    fetchData('terrain')
+        .then((data) => {
             console.log("Got terrain");
-            drawLine(await response.json());
-        });
+            drawLine(data);
+        })
+        .catch((error) => console.log(error));
 }
 
 function drawPopulation() {
-    fetch('http://0.0.0.0:3000/next')
-        .then(async (response) => {
+    fetchData('next')
+        .then((population) => {
             console.log("Got next population");
-            const population = await response.json();
             for (const route of population['routes']) {
                 drawLine(route['positions'], 'green');
             }
@@ -82,7 +92,8 @@ function drawPopulation() {
             ctx.fillText("Population id: " + population['id'], 10, 32);
             printStats(population);
             drawTable(population);
-        });
+        })
+        .catch((error) => console.log(error));
 }
 
 function canvasPoint(x, y, scale = 1) {
@@ -106,6 +117,6 @@ function drawLine(line, style = 'white') {
 function drawTable(population) {
     grid.updateConfig({
         data: population.fitness.map((v, i) => [i, v]),
-        sort: true, check
+        sort: true,
     }).forceRender();
 }

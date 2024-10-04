@@ -73,7 +73,7 @@ async fn main() {
         .expect("Lacking simulation path argument");
     let settings_file_path = env::args().nth(2).expect("Lacking settings path argument");
 
-    let app = match App::try_new(sim_file_path, settings_file_path) {
+    let app = match App::try_new(&sim_file_path, &settings_file_path) {
         Ok(app) => AppState {
             state: Arc::new(Mutex::new(app)),
         },

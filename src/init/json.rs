@@ -27,7 +27,7 @@ macro_rules! json_value_or_err {
     };
 }
 
-pub fn parse_settings(settings_file_path: String) -> Result<Settings, String> {
+pub fn parse_settings(settings_file_path: &String) -> Result<Settings, String> {
     let settings_json = read_json(settings_file_path)?;
 
     let settings = Settings {
@@ -40,7 +40,7 @@ pub fn parse_settings(settings_file_path: String) -> Result<Settings, String> {
     Ok(settings)
 }
 
-pub fn parse_sim(sim_file_path: String) -> Result<(LanderState, Terrain), String> {
+pub fn parse_sim(sim_file_path: &String) -> Result<(LanderState, Terrain), String> {
     let sim_json = read_json(sim_file_path)?;
 
     Ok((
@@ -49,7 +49,7 @@ pub fn parse_sim(sim_file_path: String) -> Result<(LanderState, Terrain), String
     ))
 }
 
-fn read_json(file_path: String) -> Result<JsonValue, String> {
+fn read_json(file_path: &String) -> Result<JsonValue, String> {
     let mut file_content = String::new();
     let mut file = File::open(file_path).map_err(|e| format!("Error while opening file: {e}"))?;
 

@@ -46,13 +46,12 @@ let routeFilter = () => { return true; };
 
 let nextButton = document.getElementById("next_button");
 nextButton.onclick = async () => {
-    await fetchDataAndHandleResponse('next', (data) => {
-        currentPopulation = data;
-    });
+    await fetchData('next', {
+        method: 'PUT',
+    }).then((data) => console.log('Next generation: ', data.response)).catch((error) => console.log(error));
     await fetchDataAndHandleResponse('population', (data) => {
         currentPopulation = data;
     });
-    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height); // clear canvas
     redraw();
 };
 
@@ -62,6 +61,7 @@ reset_button.onclick = async () => {
     await fetchData('reset', {
         method: 'PUT',
     });
+    redraw();
 };
 
 function printStats(population) {
@@ -97,8 +97,8 @@ function redraw() {
     }
 }
 
-async function fetchDataAndHandleResponse(dataType, handleResponse) {
-    await (await fetchData(dataType)).json()
+async function fetchDataAndHandleResponse(dataType, handleResponse, options = {}) {
+    await (await fetchData(dataType, options)).json()
         .then((data) => {
             handleResponse(data);
             console.log(`Got ${dataType}`);

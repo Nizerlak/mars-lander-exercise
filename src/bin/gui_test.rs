@@ -2,7 +2,7 @@ use std::sync::{Arc, Mutex};
 
 use axum::{
     extract::State,
-    http::{Method, StatusCode},
+    http::StatusCode,
     response::Json,
     routing::{get, put},
     Router,
@@ -91,7 +91,7 @@ async fn main() {
     let router = Router::new()
         .route("/terrain", get(handle_terrain))
         .route("/population", get(handle_population))
-        .route("/next", get(handle_next))
+        .route("/next", put(handle_next))
         .route(
             "/reset",
             put(|State(state): State<AppState>| async move {
@@ -120,30 +120,22 @@ async fn handle_terrain(State(state): State<AppState>) -> Json<Value> {
     Json(serde_json::to_value(v).unwrap())
 }
 
-async fn handle_next(State(state): State<AppState>) -> Result<Json<Value>, StatusCode> {
+async fn handle_next(State(state): State<AppState>) -> Result<(), (StatusCode, String)> {
     let mut app = state.state.lock().unwrap();
     app.next_population().map_err(|e: String| {
-        eprintln!("App next population failed: {e}");
-        StatusCode::INTERNAL_SERVER_ERROR
+        let e = format!("App next population failed: {e}");
+        eprintln!("{e}");
+        (StatusCode::INTERNAL_SERVER_ERROR, e)
     })?;
     app.run().map_err(|e: String| {
-        eprintln!("App run failed: {e}");
-        StatusCode::INTERNAL_SERVER_ERROR
+        let e = format!("App run failed: {e}");
+        eprintln!("{e}");
+        (StatusCode::INTERNAL_SERVER_ERROR, e)
     })?;
-    let routes = app
-        .get_routes()
-        .zip(app.get_current_states())
-        .map(lander_states_to_route)
-        .collect::<Vec<_>>();
-    let population = Population {
-        id: app.get_population_id(),
-        routes,
-        fitness: app.get_current_fitness().collect(),
-    };
-    Ok(Json(serde_json::to_value(population).unwrap()))
+    Ok(())
 }
 
-async fn handle_population(State(AppState{state}): State<AppState>) -> Result<Json<Value>, StatusCode> {
+async fn handle_population(State(AppState { state }): State<AppState>) -> Json<Value> {
     let app = state.lock().unwrap();
     let routes = app
         .get_routes()
@@ -155,7 +147,7 @@ async fn handle_population(State(AppState{state}): State<AppState>) -> Result<Js
         routes,
         fitness: app.get_current_fitness().collect(),
     };
-    Ok(Json(serde_json::to_value(population).unwrap()))
+    Json(serde_json::to_value(population).unwrap())
 }
 
 fn lander_states_to_route(

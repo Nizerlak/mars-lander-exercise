@@ -61,6 +61,9 @@ reset_button.onclick = async () => {
     await fetchData('reset', {
         method: 'PUT',
     });
+    await fetchDataAndHandleResponse('population', (data) => {
+        currentPopulation = data;
+    });
     redraw();
 };
 

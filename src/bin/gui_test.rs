@@ -90,6 +90,7 @@ async fn main() {
     // build our application with a single route
     let router = Router::new()
         .route("/terrain", get(handle_terrain))
+        .route("/population", get(handle_population))
         .route("/next", get(handle_next))
         .route(
             "/reset",
@@ -129,6 +130,21 @@ async fn handle_next(State(state): State<AppState>) -> Result<Json<Value>, Statu
         eprintln!("App run failed: {e}");
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
+    let routes = app
+        .get_routes()
+        .zip(app.get_current_states())
+        .map(lander_states_to_route)
+        .collect::<Vec<_>>();
+    let population = Population {
+        id: app.get_population_id(),
+        routes,
+        fitness: app.get_current_fitness().collect(),
+    };
+    Ok(Json(serde_json::to_value(population).unwrap()))
+}
+
+async fn handle_population(State(AppState{state}): State<AppState>) -> Result<Json<Value>, StatusCode> {
+    let app = state.lock().unwrap();
     let routes = app
         .get_routes()
         .zip(app.get_current_states())

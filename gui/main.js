@@ -34,20 +34,25 @@ const grid = new Grid({
 const scaling = 0.2;
 const maxY = 3000;
 const maxX = 7000;
+const BASE_URL = 'http://localhost:3000';
 
 ctx.canvas.width = maxX * scaling;
 ctx.canvas.height = maxY * scaling;
 
+let currentPopulation = null;
+const currentTerrain = await (await fetchData("terrain")).json();
+redraw();
+let routeFilter = () => { return true; };
 
 let nextButton = document.getElementById("next_button");
 nextButton.onclick = async () => {
-    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-    await fetchDataAndHandleResponse('terrain', (data) => {
-        currentTerrain = data;
-    });
     await fetchDataAndHandleResponse('next', (data) => {
         currentPopulation = data;
     });
+    await fetchDataAndHandleResponse('population', (data) => {
+        currentPopulation = data;
+    });
+    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height); // clear canvas
     redraw();
 };
 
@@ -58,10 +63,6 @@ reset_button.onclick = async () => {
         method: 'PUT',
     });
 };
-
-var currentPopulation = null;
-var currentTerrain = null;
-var routeFilter = ()=>{return true;};
 
 function printStats(population) {
     const routes_sizes = Array.from(population['routes'], (r) => r['positions'].length);
@@ -77,8 +78,6 @@ function printStats(population) {
     document.getElementById("stats").value = JSON.stringify(stats);
 
 }
-
-const BASE_URL = 'http://localhost:3000';
 
 async function fetchData(endpoint, options = {}) {
     const response = await fetch(`${BASE_URL}/${endpoint}`, options);
@@ -99,7 +98,7 @@ function redraw() {
 }
 
 async function fetchDataAndHandleResponse(dataType, handleResponse) {
-    await(await fetchData(dataType)).json()
+    await (await fetchData(dataType)).json()
         .then((data) => {
             handleResponse(data);
             console.log(`Got ${dataType}`);

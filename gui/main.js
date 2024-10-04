@@ -4,8 +4,8 @@ import {
 } from "https://unpkg.com/gridjs?module";
 
 console.log('hello world');
-var c = document.getElementById("myCanvas");
-var ctx = c.getContext("2d");
+let canvas = document.getElementById("myCanvas");
+let ctx = canvas.getContext("2d");
 
 const grid = new Grid({
     columns: ["Id", "Fitness"],
@@ -39,12 +39,21 @@ ctx.canvas.width = maxX * scaling;
 ctx.canvas.height = maxY * scaling;
 
 
-var nextButton = document.getElementById("next_button");
+let nextButton = document.getElementById("next_button");
 nextButton.onclick = async () => {
     ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-    drawTerrain();
-    drawPopulation();
+    await fetchDataAndHandleResponse('terrain', (data) => {
+        currentTerrain = data;
+    });
+    await fetchDataAndHandleResponse('next', (data) => {
+        currentPopulation = data;
+    });
+    redraw();
 };
+
+var currentPopulation = null;
+var currentTerrain = null;
+var routeFilter = ()=>{return true;};
 
 function printStats(population) {
     const routes_sizes = Array.from(population['routes'], (r) => r['positions'].length);
@@ -71,29 +80,38 @@ async function fetchData(endpoint) {
     return await response.json();
 }
 
-function drawTerrain() {
-    fetchData('terrain')
+function redraw() {
+    clearCanvas();
+    if (currentPopulation) {
+        drawPopulation(currentPopulation);
+    }
+    if (currentTerrain) {
+        drawLine(currentTerrain);
+    }
+}
+
+async function fetchDataAndHandleResponse(dataType, handleResponse) {
+    await fetchData(dataType)
         .then((data) => {
-            console.log("Got terrain");
-            drawLine(data);
+            handleResponse(data);
+            console.log(`Got ${dataType}`);
         })
         .catch((error) => console.log(error));
 }
 
-function drawPopulation() {
-    fetchData('next')
-        .then((population) => {
-            console.log("Got next population");
-            for (const route of population['routes']) {
-                drawLine(route['positions'], 'green');
-            }
-            ctx.fillStyle = "white";
-            ctx.font = "30px serif";
-            ctx.fillText("Population id: " + population['id'], 10, 32);
-            printStats(population);
-            drawTable(population);
-        })
-        .catch((error) => console.log(error));
+function drawPopulation(population) {
+    for (const route of population.routes.filter(routeFilter)) {
+        drawLine(route['positions'], 'green');
+    }
+    ctx.fillStyle = "white";
+    ctx.font = "30px serif";
+    ctx.fillText("Population id: " + population['id'], 10, 32);
+    printStats(population);
+    drawTable(population);
+}
+
+function clearCanvas() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 }
 
 function canvasPoint(x, y, scale = 1) {

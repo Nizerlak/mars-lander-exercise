@@ -51,6 +51,14 @@ nextButton.onclick = async () => {
     redraw();
 };
 
+
+let reset_button = document.getElementById("reset_button");
+reset_button.onclick = async () => {
+    await fetchData('reset', {
+        method: 'PUT',
+    });
+};
+
 var currentPopulation = null;
 var currentTerrain = null;
 var routeFilter = ()=>{return true;};
@@ -72,12 +80,12 @@ function printStats(population) {
 
 const BASE_URL = 'http://localhost:3000';
 
-async function fetchData(endpoint) {
-    const response = await fetch(`${BASE_URL}/${endpoint}`);
+async function fetchData(endpoint, options = {}) {
+    const response = await fetch(`${BASE_URL}/${endpoint}`, options);
     if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
     }
-    return await response.json();
+    return response;
 }
 
 function redraw() {
@@ -91,7 +99,7 @@ function redraw() {
 }
 
 async function fetchDataAndHandleResponse(dataType, handleResponse) {
-    await fetchData(dataType)
+    await(await fetchData(dataType)).json()
         .then((data) => {
             handleResponse(data);
             console.log(`Got ${dataType}`);

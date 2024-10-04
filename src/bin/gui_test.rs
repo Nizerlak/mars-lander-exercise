@@ -1,6 +1,12 @@
 use std::sync::{Arc, Mutex};
 
-use axum::{extract::State, http::StatusCode, response::Json, routing::get, Router};
+use axum::{
+    extract::State,
+    http::{Method, StatusCode},
+    response::Json,
+    routing::{get, put},
+    Router,
+};
 use serde::Serialize;
 use serde_json::Value;
 use simulation::{App, LanderState};
@@ -85,6 +91,14 @@ async fn main() {
     let router = Router::new()
         .route("/terrain", get(handle_terrain))
         .route("/next", get(handle_next))
+        .route(
+            "/reset",
+            put(|State(state): State<AppState>| async move {
+                let mut app = state.state.lock().unwrap();
+                *app = App::try_new(&sim_file_path.clone(), &settings_file_path.clone()).unwrap();
+                app.run().unwrap();
+            }),
+        )
         .with_state(app)
         .layer(CorsLayer::permissive());
 

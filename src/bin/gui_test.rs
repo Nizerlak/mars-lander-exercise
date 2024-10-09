@@ -15,13 +15,13 @@ use tower_http::cors::CorsLayer;
 
 // https://docs.rs/axum/latest/axum/index.html#using-the-state-extractor
 
-#[derive(Serialize)]
+#[derive(Serialize, Default)]
 struct Telemetry {
-    vx: f64,
-    vy: f64,
-    fuel: i32,
-    angle: f64,
-    power: i32,
+    vx: Vec<f64>,
+    vy: Vec<f64>,
+    fuel: Vec<i32>,
+    angle: Vec<f64>,
+    power: Vec<i32>,
 }
 
 #[derive(Serialize)]
@@ -55,7 +55,7 @@ impl From<&simulation::FlightState> for FlightState {
 
 #[derive(Serialize)]
 struct Route {
-    telemetry: Vec<Telemetry>,
+    telemetry: Telemetry,
     positions: Vec<(f64, f64)>,
     flight_state: FlightState,
 }
@@ -156,7 +156,7 @@ fn lander_states_to_route(
     states.fold(
         Route {
             positions: Vec::new(),
-            telemetry: Vec::new(),
+            telemetry: Telemetry::default(),
             flight_state: FlightState::from(flight_state),
         },
         |mut route, state| {
@@ -170,13 +170,11 @@ fn lander_states_to_route(
                 power,
             } = state;
             route.positions.push((x, y));
-            route.telemetry.push(Telemetry {
-                vx,
-                vy,
-                fuel,
-                angle,
-                power,
-            });
+            route.telemetry.vx.push(vx);
+            route.telemetry.vy.push(vy);
+            route.telemetry.fuel.push(fuel);
+            route.telemetry.angle.push(angle);
+            route.telemetry.power.push(power);
             route
         },
     )

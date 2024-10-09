@@ -1,5 +1,6 @@
 use std::ops::RangeInclusive;
 
+use axum::http::header::Iter;
 use rand::{seq::SliceRandom, Rng};
 
 type Angle = i32;
@@ -42,7 +43,7 @@ pub struct SolverSettings {
 }
 
 #[derive(Clone, Debug)]
-struct Chromosome {
+pub struct Chromosome {
     angles: AngleGenes,
     thrusts: ThrustGenes,
 }
@@ -276,6 +277,14 @@ impl Solver {
                 population
             },
         )
+    }
+
+    pub fn iter_population(&self) -> impl Iterator<Item = &Chromosome> {
+        self.population.iter()
+    }
+
+    pub fn iter_accumulated_population(&self) -> impl Iterator<Item = &Chromosome> {
+        self.accumulated_population.iter()
     }
 }
 

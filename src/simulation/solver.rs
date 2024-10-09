@@ -44,8 +44,8 @@ pub struct SolverSettings {
 
 #[derive(Clone, Debug)]
 pub struct Chromosome {
-    angles: AngleGenes,
-    thrusts: ThrustGenes,
+    pub angles: AngleGenes,
+    pub thrusts: ThrustGenes,
 }
 
 pub struct Solver {

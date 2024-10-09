@@ -53,6 +53,18 @@ impl From<&simulation::FlightState> for FlightState {
     }
 }
 
+#[derive(Serialize, Default)]
+struct Commands {
+    angles: Vec<i32>,
+    thrusts: Vec<i32>,
+}
+
+impl From<simulation::Chromosome> for Commands {
+    fn from(simulation::Chromosome { angles, thrusts }: simulation::Chromosome) -> Self {
+        Self { angles, thrusts }
+    }
+}
+
 #[derive(Serialize)]
 struct Route {
     telemetry: Telemetry,
@@ -65,6 +77,8 @@ struct Population {
     id: usize,
     routes: Vec<Route>,
     fitness: Vec<f64>,
+    commands: Vec<Commands>,
+    commands_accumulated: Vec<Commands>,
 }
 
 #[derive(Clone)]
@@ -146,6 +160,8 @@ async fn handle_population(State(AppState { state }): State<AppState>) -> Json<V
         id: app.get_population_id(),
         routes,
         fitness: app.get_current_fitness().collect(),
+        commands: app.get_population().cloned().map(Into::into).collect(),
+        commands_accumulated: app.get_population_accumulated().cloned().map(Into::into).collect(),
     };
     Json(serde_json::to_value(population).unwrap())
 }

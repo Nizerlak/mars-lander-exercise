@@ -109,6 +109,14 @@ impl App {
         self.lander_runner.current_flight_states()
     }
 
+    pub fn get_population(&self) -> impl Iterator<Item = &Chromosome> + '_ {
+        self.solver.iter_population()
+    }
+
+    pub fn get_population_accumulated(&self) -> impl Iterator<Item = &Chromosome> + '_ {
+        self.solver.iter_accumulated_population()
+    }
+
     pub fn get_terrain(&self) -> &Terrain {
         &self.terrain
     }

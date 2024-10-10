@@ -1,35 +1,22 @@
-import {
-    Grid,
-    html
-} from "https://unpkg.com/gridjs?module";
-
 console.log('hello world');
 let canvas = document.getElementById("myCanvas");
 let ctx = canvas.getContext("2d");
 
-const grid = new Grid({
-    columns: ["Id", "Fitness"],
-    data: [],
-    sort: true,
-    style: {
-        table: {
-            border: '3px solid #ccc'
-        },
-        th: {
-            'background-color': 'black',
-            color: 'white',
-            'border-bottom': '3px solid #ccc',
-            'text-align': 'center'
-        },
-        td: {
-            'background-color': 'black',
-            color: 'white',
-            'text-align': 'center',
-            'border': '1px solid #ccc',
-            'text-align': 'center'
-        }
-    }
-}).render(document.getElementById("wrapper"));
+
+const gridOptions = {
+    // Row Data: The data to be displayed.
+    rowData: [
+    ],
+    // Column Definitions: Defines the columns to be displayed.
+    columnDefs: [
+        { field: "Id" },
+        { field: "Fitness" },
+    ]
+};
+
+// Your Javascript code to create the Data Grid
+const myGridElement = document.querySelector('#myGrid');
+let gridApi = agGrid.createGrid(myGridElement, gridOptions);
 
 const scaling = 0.2;
 const maxY = 3000;
@@ -143,8 +130,5 @@ function drawLine(line, style = 'white') {
 }
 
 function drawTable(population) {
-    grid.updateConfig({
-        data: population.fitness.map((v, i) => [i, v]),
-        sort: true,
-    }).forceRender();
+    gridApi.setGridOption('rowData',population.fitness.map((v, i) =>  { return {Id: i, Fitness: v}; }));
 }

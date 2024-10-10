@@ -23,6 +23,7 @@ type ThrustGenes = Vec<Thrust>;
 
 pub trait CommandProvider {
     fn get_cmd(&self, id: usize, sub_id: usize) -> Option<super::Thrust>;
+    fn get_last_cmd(&self, id: usize) -> Option<super::Thrust>;
 }
 
 pub struct Settings {
@@ -133,6 +134,13 @@ impl Chromosome {
         ))
     }
 
+    pub fn get_last_cmd(&self) -> Option<super::Thrust> {
+        Some(super::Thrust::new(
+            *self.angles.last()? as f64,
+            *self.thrusts.last()?,
+        ))
+    }
+
     pub fn crossover(&self, other: &Self, cross_point: f64) -> Result<(Self, Self), String> {
         let (angles_a, angles_b) = crossed(
             &self.angles,
@@ -177,6 +185,10 @@ impl Chromosome {
 impl CommandProvider for Solver {
     fn get_cmd(&self, id: usize, sub_id: usize) -> Option<super::Thrust> {
         self.accumulated_population.get(id)?.get_cmd(sub_id)
+    }
+
+    fn get_last_cmd(&self, id: usize) -> Option<super::Thrust> {
+        self.accumulated_population.get(id)?.get_last_cmd()
     }
 }
 

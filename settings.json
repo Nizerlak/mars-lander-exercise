@@ -1,7 +1,7 @@
 {
     "PopulationSize": 200,
-    "ChromosomeSize": 160,
-    "Elitism": 0.1,
+    "ChromosomeSize": 80,
+    "Elitism": 0.15,
     "MutationProb": 0.01,
     "LandingBias": 0.5
 }

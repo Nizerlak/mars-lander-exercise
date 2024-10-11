@@ -9,6 +9,8 @@ function myRowClickedHandler(event) {
     const commands = currentPopulation.commands[routeId];
     const commandsAcc = currentPopulation.commands_accumulated[routeId];
     routeGridApi.setGridOption('rowData', commands.angles.map((v, i) => { return { angle: v, thrust: commands.thrusts[i], thrustAcc: commandsAcc.thrusts[i], angleAcc: commandsAcc.angles[i] }; }));
+    routeFilter = (_, i) => i === routeId;
+    redraw();
 }
 
 const gridOptions = {
@@ -59,7 +61,8 @@ ctx.canvas.height = maxY * scaling;
 let currentPopulation = null;
 const currentTerrain = await(await fetchData("terrain")).json();
 redraw();
-let routeFilter = () => { return true; };
+const nop = () => { return true; };
+let routeFilter = nop;
 
 let nextButton = document.getElementById("next_button");
 nextButton.onclick = async () => {
@@ -81,6 +84,12 @@ reset_button.onclick = async () => {
     await fetchDataAndHandleResponse('population', (data) => {
         currentPopulation = data;
     });
+    redraw();
+};
+
+let reset_filter_button = document.getElementById("reset_filter");
+reset_filter_button.onclick = async () => {
+    routeFilter = nop;
     redraw();
 };
 

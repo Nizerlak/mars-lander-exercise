@@ -3,5 +3,5 @@
     "ChromosomeSize": 80,
     "Elitism": 0.15,
     "MutationProb": 0.01,
-    "LandingBias": 0.5
+    "LandingBias": 0.7
 }

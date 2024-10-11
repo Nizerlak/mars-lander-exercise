@@ -3,10 +3,19 @@ let canvas = document.getElementById("myCanvas");
 let ctx = canvas.getContext("2d");
 
 
+// create handler function
+function myRowClickedHandler(event) {
+    const routeId = event.data.Id;
+    const commands = currentPopulation.commands[routeId];
+    const commandsAcc = currentPopulation.commands_accumulated[routeId];
+    routeGridApi.setGridOption('rowData', commands.angles.map((v, i) => { return { angle: v, thrust: commands.thrusts[i], thrustAcc: commandsAcc.thrusts[i], angleAcc: commandsAcc.angles[i] }; }));
+}
+
 const gridOptions = {
     // Row Data: The data to be displayed.
     rowData: [
     ],
+    onRowClicked: myRowClickedHandler,
     // Column Definitions: Defines the columns to be displayed.
     columnDefs: [
         { field: "Id" },
@@ -15,8 +24,29 @@ const gridOptions = {
 };
 
 // Your Javascript code to create the Data Grid
-const myGridElement = document.querySelector('#myGrid');
-let gridApi = agGrid.createGrid(myGridElement, gridOptions);
+const fitnessGrid = document.querySelector('#fitnessGrid');
+let fitnessGridApi = agGrid.createGrid(fitnessGrid, gridOptions);
+
+const routeGridOptions = {
+    // Row Data: The data to be displayed.
+    rowData: [
+    ],
+    // Column Definitions: Defines the columns to be displayed.
+    columnDefs: [
+        {
+            headerName: "Accumulated",
+            children: [{ headerName: "Angle", field: "angleAcc", sortable: false, columnGroupShow: "open" }, { headerName: "Thrust", field: "thrustAcc", sortable: false, columnGroupShow: "open" }],
+        },
+        {
+            headerName: "Commands",
+            children: [{ headerName: "Angle", field: "angle", sortable: false }, { headerName: "Thrust", field: "thrust", sortable: false }],
+        },
+    ]
+};
+
+// Your Javascript code to create the Data Grid
+const routeGrid = document.querySelector('#routeGrid');
+let routeGridApi = agGrid.createGrid(routeGrid, routeGridOptions);
 
 const scaling = 0.2;
 const maxY = 3000;
@@ -27,7 +57,7 @@ ctx.canvas.width = maxX * scaling;
 ctx.canvas.height = maxY * scaling;
 
 let currentPopulation = null;
-const currentTerrain = await (await fetchData("terrain")).json();
+const currentTerrain = await(await fetchData("terrain")).json();
 redraw();
 let routeFilter = () => { return true; };
 
@@ -104,7 +134,7 @@ function drawPopulation(population) {
     ctx.font = "30px serif";
     ctx.fillText("Population id: " + population['id'], 10, 32);
     printStats(population);
-    drawTable(population);
+    drawFitnessTable(population);
 }
 
 function clearCanvas() {
@@ -129,6 +159,6 @@ function drawLine(line, style = 'white') {
     ctx.closePath();
 }
 
-function drawTable(population) {
-    gridApi.setGridOption('rowData',population.fitness.map((v, i) =>  { return {Id: i, Fitness: v}; }));
+function drawFitnessTable(population) {
+    fitnessGridApi.setGridOption('rowData', population.fitness.map((v, i) => { return { Id: i, Fitness: v }; }));
 }

@@ -1,6 +1,5 @@
 use std::ops::RangeInclusive;
 
-use axum::http::header::Iter;
 use rand::{seq::SliceRandom, Rng};
 
 type Angle = i32;
@@ -322,14 +321,12 @@ impl FitnessCalculator {
             self.landing_bias + (1. - self.landing_bias) * error / max.unwrap()
         };
 
-        let (nv_max, tfh_max, tfv_max) =
+        let err_max =
             landing_results
                 .iter()
-                .fold((None, None, None), |(a, b, c), landing| match landing {
-                    Landing::NotVertical { error } => (some_or_max(a, error.abs()), b, c),
-                    Landing::TooFastHorizontal { error } => (a, some_or_max(b, error.abs()), c),
-                    Landing::TooFastVertical { error } => (a, b, some_or_max(c, error.abs())),
-                    _ => (a, b, c),
+                .fold(None, |err, landing| match landing {
+                    &Landing::NotVertical{ error_rel, .. } | &Landing::TooFastHorizontal{ error_rel, .. } | &Landing::TooFastVertical{ error_rel,.. } => some_or_max(err,error_rel),
+                    _ => err,
                 });
         Some(
             landing_results
@@ -337,9 +334,7 @@ impl FitnessCalculator {
                 .zip(distances)
                 .map(|(result, dist_points)| match result {
                     &Landing::Correct => 1.,
-                    &Landing::NotVertical { error } => landed_normalized(error, nv_max),
-                    &Landing::TooFastHorizontal { error } => landed_normalized(error, tfh_max),
-                    &Landing::TooFastVertical { error } => landed_normalized(error, tfv_max),
+                    &Landing::NotVertical{ error_rel, .. } | &Landing::TooFastHorizontal{ error_rel, .. } | &Landing::TooFastVertical{ error_rel, .. } => landed_normalized(error_rel, err_max),
                     &Landing::WrongTerrain | &Landing::OutOfMap => dist_points * self.landing_bias,
                 })
                 .collect(),

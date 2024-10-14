@@ -1,4 +1,4 @@
-mod defaults {
+pub(crate) mod defaults {
     pub const G: f64 = 3.711;
     pub const ANGLE_STEP: f64 = 15.;
     pub const POWER_STEP: i32 = 1;

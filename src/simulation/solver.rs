@@ -349,7 +349,7 @@ impl FitnessCalculator {
     fn dist_to_target(&self, (x, y): Point) -> f64 {
         let ((tx1, tx2), ty) = &self.target;
         let dist =
-            |(a1, a2): Point, (b1, b2): Point| ((a1 - a2).powi(2) + (b1 - b2).powi(2)).sqrt();
+            |(a1, a2): Point, (b1, b2): Point| ((a1 - b1).powi(2) + (a2 - b2).powi(2)).sqrt();
         if x < *tx1 {
             dist((x, y), (*tx1, *ty))
         } else if x > *tx2 {

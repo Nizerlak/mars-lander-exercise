@@ -71,8 +71,11 @@ nextButton.onclick = async () => {
     }).then((data) => console.log('Next generation: ', data.response)).catch((error) => console.log(error));
     await fetchDataAndHandleResponse('population', (data) => {
         currentPopulation = data;
+        console.log("Population");
+        console.log(currentPopulation);
     });
     redraw();
+    drawFitnessTable(currentPopulation);
 };
 
 
@@ -85,6 +88,7 @@ reset_button.onclick = async () => {
         currentPopulation = data;
     });
     redraw();
+    drawFitnessTable(currentPopulation);
 };
 
 let reset_filter_button = document.getElementById("reset_filter");
@@ -143,7 +147,6 @@ function drawPopulation(population) {
     ctx.font = "30px serif";
     ctx.fillText("Population id: " + population['id'], 10, 32);
     printStats(population);
-    drawFitnessTable(population);
 }
 
 function clearCanvas() {

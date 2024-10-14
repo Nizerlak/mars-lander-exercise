@@ -44,9 +44,9 @@ impl From<&simulation::FlightState> for FlightState {
             FS::Landed(landing) => match landing {
                 L::Correct => Self::LandedCorrectly,
                 L::WrongTerrain => Self::CrashedWrongTerrain,
-                L::NotVertical { error: _ } => Self::CrashedNotVertical,
-                L::TooFastVertical { error: _ } => Self::CrashedTooFastVertical,
-                L::TooFastHorizontal { error: _ } => Self::CrashedTooFastHorizontal,
+                L::NotVertical { .. } => Self::CrashedNotVertical,
+                L::TooFastVertical { .. } => Self::CrashedTooFastVertical,
+                L::TooFastHorizontal { .. } => Self::CrashedTooFastHorizontal,
                 L::OutOfMap => Self::OutOfMap,
             },
         }
@@ -160,7 +160,11 @@ async fn handle_population(State(AppState { state }): State<AppState>) -> Json<V
         routes,
         fitness: app.get_current_fitness().collect(),
         commands: app.get_population().cloned().map(Into::into).collect(),
-        commands_accumulated: app.get_population_accumulated().cloned().map(Into::into).collect(),
+        commands_accumulated: app
+            .get_population_accumulated()
+            .cloned()
+            .map(Into::into)
+            .collect(),
     };
     Json(serde_json::to_value(population).unwrap())
 }

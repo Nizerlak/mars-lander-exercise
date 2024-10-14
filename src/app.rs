@@ -72,17 +72,17 @@ impl App {
                 .collect::<Result<Vec<_>, String>>()?,
         ).ok_or("Failed to calculate fitness")?;
         self.solver.new_generation(fitness.iter().copied())?;
-        self.lander_runner
-            .reinitialize(self.initial_lander_state.clone());
-        self.flight_histories.iter_mut().for_each(|h| {
-            *h = LanderHistory::with_initial_state(self.initial_lander_state.clone())
-        });
         self.current_fitness = fitness;
         self.population_id += 1;
         Ok(())
     }
 
     pub fn run(&mut self) -> Result<ExecutionStatus, String> {
+        self.lander_runner
+            .reinitialize(self.initial_lander_state.clone());
+        self.flight_histories.iter_mut().for_each(|h| {
+            *h = LanderHistory::with_initial_state(self.initial_lander_state.clone())
+        });
         let res = loop {
             match self
                 .lander_runner

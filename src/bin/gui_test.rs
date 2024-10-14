@@ -99,7 +99,6 @@ async fn main() {
         },
         Err(e) => panic!("{e}"),
     };
-    app.state.lock().unwrap().run().unwrap();
 
     // build our application with a single route
     let router = Router::new()
@@ -136,13 +135,13 @@ async fn handle_terrain(State(state): State<AppState>) -> Json<Value> {
 
 async fn handle_next(State(state): State<AppState>) -> Result<(), (StatusCode, String)> {
     let mut app = state.state.lock().unwrap();
-    app.next_population().map_err(|e: String| {
-        let e = format!("App next population failed: {e}");
+    app.run().map_err(|e: String| {
+        let e = format!("App run failed: {e}");
         eprintln!("{e}");
         (StatusCode::INTERNAL_SERVER_ERROR, e)
     })?;
-    app.run().map_err(|e: String| {
-        let e = format!("App run failed: {e}");
+    app.next_population().map_err(|e: String| {
+        let e = format!("App next population failed: {e}");
         eprintln!("{e}");
         (StatusCode::INTERNAL_SERVER_ERROR, e)
     })?;

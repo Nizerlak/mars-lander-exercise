@@ -237,7 +237,7 @@ impl Solver {
 
     fn choose_parents(&self, fitness: impl Iterator<Item = f64>) -> Vec<&Chromosome> {
         let mut ranking = self.population.iter().zip(fitness).collect::<Vec<_>>();
-        ranking.sort_by(|(_, fitness1), (_, fitness2)| fitness1.total_cmp(fitness2));
+        ranking.sort_by(|(_, fitness1), (_, fitness2)| fitness1.total_cmp(fitness2).reverse());
 
         let n_best = (self.elitism * self.population.len() as f64) as usize;
         ranking[..n_best].iter().map(|(c, _)| *c).collect()

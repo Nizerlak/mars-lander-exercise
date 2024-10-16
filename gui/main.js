@@ -2,12 +2,21 @@ console.log('hello world');
 let canvas = document.getElementById("myCanvas");
 let ctx = canvas.getContext("2d");
 
+function setRouteState(routeId) {
+    let text_box = document.getElementById("route_state");
+    if (routeId == null) {
+        text_box.value = "";
+    } else {
+        text_box.value = currentPopulation.routes[routeId].flight_state;
+    }
+}
 
 // create handler function
 function myRowClickedHandler(event) {
     const routeId = event.data.Id;
     const commands = currentPopulation.commands[routeId];
     const commandsAcc = currentPopulation.commands_accumulated[routeId];
+    setRouteState(routeId);
     routeGridApi.setGridOption('rowData', commands.angles.map((v, i) => { return { angle: v, thrust: commands.thrusts[i], thrustAcc: commandsAcc.thrusts[i], angleAcc: commandsAcc.angles[i] }; }));
     routeFilter = (_, i) => i === routeId;
     redraw();
@@ -94,6 +103,7 @@ reset_button.onclick = async () => {
 let reset_filter_button = document.getElementById("reset_filter");
 reset_filter_button.onclick = async () => {
     routeFilter = nop;
+    setRouteState(null); 
     redraw();
 };
 

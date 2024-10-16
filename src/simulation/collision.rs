@@ -72,19 +72,22 @@ impl CollisionChecker {
                 let colision_state = if ty1 != ty2 {
                     Landing::WrongTerrain
                 } else if current_state.angle != 0. {
-                    let error_abs= current_state.angle.abs() - self.angle_step;
+                    let error_abs = current_state.angle.abs();
                     Landing::NotVertical {
-                        error_abs, error_rel: error_abs / self.angle_step,
+                        error_abs,
+                        error_rel: (error_abs - self.angle_step).max(0f64) / self.angle_step,
                     }
                 } else if current_state.vx.abs() > self.max_horizontal_speed {
                     let error_abs = current_state.vx.abs() - self.max_horizontal_speed;
                     Landing::TooFastHorizontal {
-                        error_abs, error_rel: error_abs / self.max_horizontal_speed,
+                        error_abs,
+                        error_rel: error_abs / self.max_horizontal_speed,
                     }
                 } else if current_state.vy.abs() > self.max_vertical_speed {
                     let error_abs = current_state.vy.abs() - self.max_vertical_speed;
                     Landing::TooFastVertical {
-                        error_abs, error_rel: error_abs / self.max_vertical_speed,
+                        error_abs,
+                        error_rel: error_abs / self.max_vertical_speed,
                     }
                 } else {
                     Landing::Correct
@@ -104,6 +107,7 @@ impl CollisionChecker {
     }
 
     pub fn with_max_vertical_speed(self, max_vertical_speed: f64) -> Self {
+        assert!(max_vertical_speed > 0.);
         Self {
             max_vertical_speed,
             ..self
@@ -111,6 +115,7 @@ impl CollisionChecker {
     }
 
     pub fn with_max_horizontal_speed(self, max_horizontal_speed: f64) -> Self {
+        assert!(max_horizontal_speed > 0.);
         Self {
             max_horizontal_speed,
             ..self
@@ -348,7 +353,7 @@ mod collision_checker_tests {
             checker()
                 .check(&terrain(), &previous_state, &current_state)
                 .unwrap(),
-            ((x, y), Landing::NotVertical{error_abs, error_rel:_}) if x == 1500. && y == 100. && error_abs == -10.
+            ((x, y), Landing::NotVertical{error_abs, error_rel:_}) if x == 1500. && y == 100. && error_abs == 10.
         ));
     }
 

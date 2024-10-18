@@ -16,10 +16,27 @@ pub struct Terrain {
 #[derive(Debug, Clone)]
 pub enum Landing {
     Correct,
-    WrongTerrain,
-    NotVertical { error_abs: f64, error_rel: f64 },
-    TooFastVertical { error_abs: f64, error_rel: f64 },
-    TooFastHorizontal { error_abs: f64, error_rel: f64 },
+    /// Landed on non-flat terrain or out of map
+    ///
+    /// # Fields
+    ///
+    /// * `dist` - A floating-point value representing the distance from origin projected on terrain
+    /// segments counter-clockwise (including map boundaries).
+    WrongTerrain {
+        dist: f64,
+    },
+    NotVertical {
+        error_abs: f64,
+        error_rel: f64,
+    },
+    TooFastVertical {
+        error_abs: f64,
+        error_rel: f64,
+    },
+    TooFastHorizontal {
+        error_abs: f64,
+        error_rel: f64,
+    },
 }
 
 pub struct CollisionChecker {
@@ -85,18 +102,21 @@ impl CollisionChecker {
         previous_state: &LanderState,
         current_state: &LanderState,
     ) -> Option<((f64, f64), Landing)> {
+        let mut dist = 0.;
         for terrain_segment in self.iter_map(terrain) {
             let lander_path_segment = (
                 Vec2::new(previous_state.x, previous_state.y),
                 Vec2::new(current_state.x, current_state.y),
             );
-            if let Some(collsiion_point) = check_collision(terrain_segment, lander_path_segment) {
+
+            if let Some(collision_point) = check_collision(terrain_segment, lander_path_segment) {
+                let collision_distance = dist+distance(terrain_segment.0, collision_point);
                 // non-flat terrain
                 let colision_state = if terrain_segment.0.y != terrain_segment.1.y {
-                    Landing::WrongTerrain
+                    Landing::WrongTerrain { dist: collision_distance }
                 } else if terrain_segment.0.y >= self.max_y {
                     //ceiling
-                    Landing::WrongTerrain
+                    Landing::WrongTerrain { dist: collision_distance }
                 } else if current_state.angle != 0. {
                     let error_abs = current_state.angle.abs();
                     Landing::NotVertical {
@@ -118,8 +138,9 @@ impl CollisionChecker {
                 } else {
                     Landing::Correct
                 };
-                return Some((collsiion_point, colision_state));
+                return Some(((collision_point.x, collision_point.y), colision_state));
             }
+            dist += distance(terrain_segment.0,terrain_segment.1);
         }
         None
     }
@@ -190,7 +211,7 @@ impl Vec2 {
     }
 }
 
-fn check_collision(segment_a: (Vec2, Vec2), segment_b: (Vec2, Vec2)) -> Option<(f64, f64)> {
+fn check_collision(segment_a: (Vec2, Vec2), segment_b: (Vec2, Vec2)) -> Option<Vec2> {
     // https://stackoverflow.com/questions/563198/how-do-you-detect-where-two-line-segments-intersect
 
     let (p, p1) = segment_a;
@@ -218,17 +239,21 @@ fn check_collision(segment_a: (Vec2, Vec2), segment_b: (Vec2, Vec2)) -> Option<(
             // collinear, disjoint
             None
         } else {
-            Some((q.x, q.y))
+            Some(Vec2::new(q.x, q.y))
         }
     } else if rs == 0f64 && qpr != 0f64 {
         // parallel, not intersecting
         None
     } else if rs != 0f64 && t >= 0f64 && t <= 1f64 && u >= 0f64 && u <= 1f64 {
         let Vec2 { x, y } = p.add(r.scale(t));
-        Some((x, y))
+        Some(Vec2::new(x, y))
     } else {
         None
     }
+}
+
+fn distance(a: Vec2, b: Vec2) -> f64 {
+    (a.x - b.x).hypot(a.y - b.y)
 }
 
 #[cfg(test)]
@@ -269,7 +294,7 @@ mod collision_checker_tests {
             checker()
                 .check(&terrain(), &previous_state, &current_state)
                 .unwrap(),
-            ((x, y), Landing::WrongTerrain) if x ==0. && y == 700.
+            ((x, y), Landing::WrongTerrain{dist}) if x ==0. && y == 700. && dist == 2300.
         ));
     }
 
@@ -282,7 +307,7 @@ mod collision_checker_tests {
             checker()
                 .check(&terrain(), &previous_state, &current_state)
                 .unwrap(),
-            ((x, y), Landing::WrongTerrain) if x == 7000. && y == 700.
+            ((x, y), Landing::WrongTerrain{..}) if x == 7000. && y == 700.
         ));
     }
 
@@ -295,7 +320,7 @@ mod collision_checker_tests {
             checker()
                 .check(&terrain(), &previous_state, &current_state)
                 .unwrap(),
-            ((x, y), Landing::WrongTerrain) if x == 1000. && y == 3000.
+            ((x, y), Landing::WrongTerrain{..}) if x == 1000. && y == 3000.
         ));
     }
 
@@ -308,7 +333,7 @@ mod collision_checker_tests {
             checker()
                 .check(&terrain(), &previous_state, &current_state)
                 .unwrap(),
-            ((x, y), Landing::WrongTerrain) if x == 7000. && y == 3000.
+            ((x, y), Landing::WrongTerrain{..}) if x == 7000. && y == 3000.
         ));
     }
 
@@ -321,7 +346,7 @@ mod collision_checker_tests {
             checker()
                 .check(&terrain(), &previous_state, &current_state)
                 .unwrap(),
-            ((x, y), Landing::WrongTerrain) if x == 0. && y == 3000.
+            ((x, y), Landing::WrongTerrain{dist}) if x == 0. && y == 3000. && dist == 0.
         ));
     }
 
@@ -334,7 +359,7 @@ mod collision_checker_tests {
             checker()
                 .check(&terrain(), &previous_state, &current_state)
                 .unwrap(),
-            (_, Landing::WrongTerrain)
+            (_, Landing::WrongTerrain{..})
         ));
     }
 
@@ -449,7 +474,7 @@ mod collision_tests {
     fn check(
         ((a00, a01), (a10, a11)): ((f64, f64), (f64, f64)),
         ((b00, b01), (b10, b11)): ((f64, f64), (f64, f64)),
-    ) -> Option<(f64, f64)> {
+    ) -> Option<Vec2> {
         check_collision(
             (Vec2 { x: a00, y: a01 }, Vec2 { x: a10, y: a11 }),
             (Vec2 { x: b00, y: b01 }, Vec2 { x: b10, y: b11 }),
@@ -473,61 +498,61 @@ mod collision_tests {
 
     #[test]
     fn touching_not_parallel() {
-        let (x, y) = check(((1., 5.), (2., 2.)), ((0., 0.), (3., 3.))).unwrap();
+        let Vec2{x, y} = check(((1., 5.), (2., 2.)), ((0., 0.), (3., 3.))).unwrap();
         assert_eq!(x, 2.);
         assert_eq!(y, 2.);
     }
 
     #[test]
     fn touching_not_parallel2() {
-        let (x, y) = check(((2., 2.), (1., 5.)), ((0., 0.), (3., 3.))).unwrap();
+        let Vec2{x, y} = check(((2., 2.), (1., 5.)), ((0., 0.), (3., 3.))).unwrap();
         assert_eq!(x, 2.);
         assert_eq!(y, 2.);
     }
 
     #[test]
     fn crossing() {
-        let (x, y) = check(((2., 5.), (2., -2.)), ((0., 0.), (3., 3.))).unwrap();
+        let Vec2{x, y} = check(((2., 5.), (2., -2.)), ((0., 0.), (3., 3.))).unwrap();
         assert_eq!(x, 2.);
         assert_eq!(y, 2.);
     }
 
     #[test]
     fn direction_independent() {
-        let (x, y) = check(((2., 5.), (2., -2.)), ((0., 0.), (3., 3.))).unwrap();
+        let Vec2{x, y} = check(((2., 5.), (2., -2.)), ((0., 0.), (3., 3.))).unwrap();
         assert_eq!(x, 2.);
         assert_eq!(y, 2.);
 
-        let (x, y) = check(((2., 5.), (2., -2.)), ((3., 3.), (0., 0.))).unwrap();
+        let Vec2{x, y} = check(((2., 5.), (2., -2.)), ((3., 3.), (0., 0.))).unwrap();
         assert_eq!(x, 2.);
         assert_eq!(y, 2.);
 
-        let (x, y) = check(((2., -2.), (2., 5.)), ((0., 0.), (3., 3.))).unwrap();
+        let Vec2{x, y} = check(((2., -2.), (2., 5.)), ((0., 0.), (3., 3.))).unwrap();
         assert_eq!(x, 2.);
         assert_eq!(y, 2.);
 
-        let (x, y) = check(((2., 5.), (2., -2.)), ((0., 0.), (3., 3.))).unwrap();
+        let Vec2{x, y} = check(((2., 5.), (2., -2.)), ((0., 0.), (3., 3.))).unwrap();
         assert_eq!(x, 2.);
         assert_eq!(y, 2.);
     }
 
     #[test]
     fn collinear_touching() {
-        let (x, y) = check(((-3., 1.), (1., 1.)), ((1., 1.), (3., 1.))).unwrap();
+        let Vec2{x, y} = check(((-3., 1.), (1., 1.)), ((1., 1.), (3., 1.))).unwrap();
         assert_eq!(x, 1.);
         assert_eq!(y, 1.);
     }
 
     #[test]
     fn collinear_overlaping() {
-        let (x, y) = check(((-2., 1.), (2., 1.)), ((1., 1.), (3., 1.))).unwrap();
+        let Vec2{x, y} = check(((-2., 1.), (2., 1.)), ((1., 1.), (3., 1.))).unwrap();
         assert_eq!(x, 1.);
         assert_eq!(y, 1.);
     }
 
     #[test]
     fn collinear_overlaping2() {
-        let (x, y) = check(((-2., 1.), (5., 1.)), ((1., 1.), (3., 1.))).unwrap();
+        let Vec2{x, y} = check(((-2., 1.), (5., 1.)), ((1., 1.), (3., 1.))).unwrap();
         assert_eq!(x, 1.);
         assert_eq!(y, 1.);
     }

@@ -223,7 +223,6 @@ impl Solver {
         self.accumulated_population =
             Self::accumulated_population(self.initial_angle, self.initial_thrust, &self.population);
         assert_eq!(len_population_before, self.population.len());
-        self.mutate();
         Ok(())
     }
 
@@ -245,19 +244,15 @@ impl Solver {
                 let mut r = parents.choose_multiple(&mut rand::thread_rng(), 2);
                 let parent1 = r.next().ok_or("Can't get parent1")?;
                 let parent2 = r.next().ok_or("Can't get parent2")?;
-                let (c1, c2) =
+                let (mut c1, mut c2) =
                     parent1.crossover(&parent2, rand::thread_rng().gen_range(0f64..1f64))?;
+                c1.mutate(self.mutation_prob);
+                c2.mutate(self.mutation_prob);
                 new_population.push(c1);
                 new_population.push(c2);
                 Ok::<Vec<_>, String>(new_population)
             })?;
         Ok(new_population)
-    }
-
-    fn mutate(&mut self) {
-        self.population.iter_mut().for_each(|c| {
-            c.mutate(self.mutation_prob);
-        })
     }
 
     fn accumulated_population(

@@ -335,7 +335,7 @@ impl FitnessCalculator {
                 .map(|(result, dist_points)| match result {
                     &Landing::Correct => 1.,
                     &Landing::NotVertical{ error_rel, .. } | &Landing::TooFastHorizontal{ error_rel, .. } | &Landing::TooFastVertical{ error_rel, .. } => landed_normalized(error_rel, err_max),
-                    &Landing::WrongTerrain | &Landing::OutOfMap => dist_points * self.landing_bias,
+                    &Landing::WrongTerrain => dist_points * self.landing_bias,
                 })
                 .collect(),
         )

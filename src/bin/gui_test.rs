@@ -32,7 +32,6 @@ pub enum FlightState {
     CrashedNotVertical,
     CrashedTooFastVertical,
     CrashedTooFastHorizontal,
-    OutOfMap,
 }
 
 impl From<&simulation::FlightState> for FlightState {
@@ -47,7 +46,6 @@ impl From<&simulation::FlightState> for FlightState {
                 L::NotVertical { .. } => Self::CrashedNotVertical,
                 L::TooFastVertical { .. } => Self::CrashedTooFastVertical,
                 L::TooFastHorizontal { .. } => Self::CrashedTooFastHorizontal,
-                L::OutOfMap => Self::OutOfMap,
             },
         }
     }

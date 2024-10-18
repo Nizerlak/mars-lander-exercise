@@ -20,7 +20,6 @@ pub enum Landing {
     NotVertical { error_abs: f64, error_rel: f64 },
     TooFastVertical { error_abs: f64, error_rel: f64 },
     TooFastHorizontal { error_abs: f64, error_rel: f64 },
-    OutOfMap,
 }
 
 pub struct CollisionChecker {

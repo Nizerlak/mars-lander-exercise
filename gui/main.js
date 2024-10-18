@@ -7,7 +7,7 @@ function setRouteState(routeId) {
     if (routeId == null) {
         text_box.value = "";
     } else {
-        text_box.value = currentPopulation.routes[routeId].flight_state;
+        text_box.value = `Flight State: ${currentPopulation.routes[routeId].flight_state}, Positions Length: ${currentPopulation.routes[routeId].positions.length}`;
     }
 }
 

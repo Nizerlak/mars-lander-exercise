@@ -43,33 +43,60 @@ impl Default for CollisionChecker {
     }
 }
 
+struct MapIterator<'a> {
+    previous_point: Vec2,
+    map_iter: Box<dyn Iterator<Item = Vec2> + 'a>,
+}
+
+impl<'a> MapIterator<'a> {
+    fn new(max_x: f64, max_y: f64, terrain: &'a Terrain) -> Self {
+        let map_iter = terrain
+            .x
+            .iter()
+            .zip(terrain.y.iter())
+            .map(|(&x, &y)| Vec2::new(x, y))
+            .chain(std::iter::once(Vec2::new(max_x, max_y)))
+            .chain(std::iter::once(Vec2::new(0., max_y)));
+        Self {
+            previous_point: Vec2::new(0., max_y),
+            map_iter: Box::new(map_iter),
+        }
+    }
+}
+
+impl Iterator for MapIterator<'_> {
+    type Item = (Vec2, Vec2);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let next_point = self.map_iter.next()?;
+        let segment = (self.previous_point, next_point);
+        self.previous_point = next_point;
+        Some(segment)
+    }
+}
+
 impl CollisionChecker {
+    fn iter_map<'a>(&self, terrain: &'a Terrain) -> MapIterator<'a> {
+        MapIterator::new(self.max_x, self.max_y, terrain)
+    }
+
     pub fn check(
         &self,
         terrain: &Terrain,
         previous_state: &LanderState,
         current_state: &LanderState,
     ) -> Option<((f64, f64), Landing)> {
-        let (x, y) = (current_state.x, current_state.y);
-        if x < 0. || x > self.max_x || y < 0. || y > self.max_y {
-            let clamp = |a: f64, min: f64, max: f64| max.min(min.max(a));
-            return Some((
-                (clamp(x, 0., self.max_x), clamp(y, 0., self.max_y)),
-                Landing::OutOfMap,
-            ));
-        }
-        for (x, y) in terrain.x.windows(2).zip(terrain.y.windows(2)) {
-            let [tx1, tx2] = *x else { panic!() };
-            let [ty1, ty2] = *y else { panic!() };
-
-            let terrain_segment = (Vec2::new(tx1, ty1), Vec2::new(tx2, ty2));
+        for terrain_segment in self.iter_map(terrain) {
             let lander_path_segment = (
                 Vec2::new(previous_state.x, previous_state.y),
                 Vec2::new(current_state.x, current_state.y),
             );
             if let Some(collsiion_point) = check_collision(terrain_segment, lander_path_segment) {
                 // non-flat terrain
-                let colision_state = if ty1 != ty2 {
+                let colision_state = if terrain_segment.0.y != terrain_segment.1.y {
+                    Landing::WrongTerrain
+                } else if terrain_segment.0.y >= self.max_y {
+                    //ceiling
                     Landing::WrongTerrain
                 } else if current_state.angle != 0. {
                     let error_abs = current_state.angle.abs();
@@ -123,7 +150,7 @@ impl CollisionChecker {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Vec2 {
     x: f64,
     y: f64,
@@ -212,7 +239,7 @@ mod collision_checker_tests {
     fn terrain() -> Terrain {
         Terrain {
             x: vec![0., 3500., 7000.],
-            y: vec![100., 100., 3000.],
+            y: vec![100., 100., 150.],
         }
     }
 
@@ -236,79 +263,66 @@ mod collision_checker_tests {
 
     #[test]
     fn out_of_map1() {
-        let previous_state = LanderState::default().with_x(1000.).with_y(500.);
+        let previous_state = LanderState::default().with_x(1.).with_y(700.);
         let current_state = LanderState::default().with_x(-5.).with_y(700.);
 
         assert!(matches!(
             checker()
                 .check(&terrain(), &previous_state, &current_state)
                 .unwrap(),
-            ((x, y), Landing::OutOfMap) if x ==0. && y == 700.
+            ((x, y), Landing::WrongTerrain) if x ==0. && y == 700.
         ));
     }
 
     #[test]
     fn out_of_map2() {
-        let previous_state = LanderState::default().with_x(1000.).with_y(500.);
+        let previous_state = LanderState::default().with_x(6900.).with_y(700.);
         let current_state = LanderState::default().with_x(7100.).with_y(700.);
 
         assert!(matches!(
             checker()
                 .check(&terrain(), &previous_state, &current_state)
                 .unwrap(),
-            ((x, y), Landing::OutOfMap) if x == 7000. && y == 700.
+            ((x, y), Landing::WrongTerrain) if x == 7000. && y == 700.
         ));
     }
 
     #[test]
     fn out_of_map3() {
-        let previous_state = LanderState::default().with_x(1000.).with_y(500.);
-        let current_state = LanderState::default().with_x(1500.).with_y(-5.);
+        let previous_state = LanderState::default().with_x(1000.).with_y(2900.);
+        let current_state = LanderState::default().with_x(1000.).with_y(3100.);
 
         assert!(matches!(
             checker()
                 .check(&terrain(), &previous_state, &current_state)
                 .unwrap(),
-            ((x, y), Landing::OutOfMap) if x == 1500. && y == 0.
+            ((x, y), Landing::WrongTerrain) if x == 1000. && y == 3000.
         ));
     }
 
     #[test]
     fn out_of_map4() {
-        let previous_state = LanderState::default().with_x(1000.).with_y(500.);
-        let current_state = LanderState::default().with_x(1500.).with_y(5000.);
+        let previous_state = LanderState::default().with_x(6900.).with_y(2900.);
+        let current_state = LanderState::default().with_x(7100.).with_y(3100.);
 
         assert!(matches!(
             checker()
                 .check(&terrain(), &previous_state, &current_state)
                 .unwrap(),
-            ((x, y), Landing::OutOfMap) if x == 1500. && y == 3000.
+            ((x, y), Landing::WrongTerrain) if x == 7000. && y == 3000.
         ));
     }
 
     #[test]
     fn out_of_map5() {
-        let previous_state = LanderState::default().with_x(1000.).with_y(500.);
-        let current_state = LanderState::default().with_x(7100.).with_y(5000.);
+        let previous_state = LanderState::default().with_x(100.).with_y(2900.);
+        let current_state = LanderState::default().with_x(-100.).with_y(3100.);
 
         assert!(matches!(
             checker()
                 .check(&terrain(), &previous_state, &current_state)
                 .unwrap(),
-            ((x, y), Landing::OutOfMap) if x == 7000. && y == 3000.
-        ));
-    }
-
-    #[test]
-    fn out_of_map6() {
-        let previous_state = LanderState::default().with_x(1000.).with_y(500.);
-        let current_state = LanderState::default().with_x(-5.).with_y(-5.);
-
-        assert!(matches!(
-            checker()
-                .check(&terrain(), &previous_state, &current_state)
-                .unwrap(),
-            ((x, y), Landing::OutOfMap) if x == 0. && y == 0.
+            ((x, y), Landing::WrongTerrain) if x == 0. && y == 3000.
         ));
     }
 
@@ -517,5 +531,83 @@ mod collision_tests {
         let (x, y) = check(((-2., 1.), (5., 1.)), ((1., 1.), (3., 1.))).unwrap();
         assert_eq!(x, 1.);
         assert_eq!(y, 1.);
+    }
+}
+
+#[cfg(test)]
+mod map_iterator_tests {
+    use super::*;
+
+    fn terrain() -> Terrain {
+        Terrain {
+            x: vec![0., 3500.],
+            y: vec![100., 100.],
+        }
+    }
+
+    #[test]
+    fn map_iterator_basic() {
+        let terrain = terrain();
+        let mut map_iter = MapIterator::new(7000., 3000., &terrain);
+
+        assert_eq!(
+            map_iter.next().unwrap(),
+            (Vec2::new(0., 3000.), Vec2::new(0., 100.))
+        );
+        assert_eq!(
+            map_iter.next(),
+            Some((Vec2::new(0., 100.), Vec2::new(3500., 100.)))
+        );
+        assert_eq!(
+            map_iter.next(),
+            Some((Vec2::new(3500., 100.), Vec2::new(7000., 3000.)))
+        );
+        assert_eq!(
+            map_iter.next(),
+            Some((Vec2::new(7000., 3000.), Vec2::new(0., 3000.)))
+        );
+        assert_eq!(map_iter.next(), None);
+    }
+
+    #[test]
+    fn map_iterator_empty_terrain() {
+        let terrain = Terrain {
+            x: vec![],
+            y: vec![],
+        };
+        let mut map_iter = MapIterator::new(7000., 3000., &terrain);
+
+        assert_eq!(
+            map_iter.next(),
+            Some((Vec2::new(0., 3000.), Vec2::new(7000., 3000.)))
+        );
+        assert_eq!(
+            map_iter.next(),
+            Some((Vec2::new(7000., 3000.), Vec2::new(0., 3000.)))
+        );
+        assert_eq!(map_iter.next(), None);
+    }
+
+    #[test]
+    fn map_iterator_single_point_terrain() {
+        let terrain = Terrain {
+            x: vec![3500.],
+            y: vec![100.],
+        };
+        let mut map_iter = MapIterator::new(7000., 3000., &terrain);
+
+        assert_eq!(
+            map_iter.next(),
+            Some((Vec2::new(0., 3000.), Vec2::new(3500., 100.)))
+        );
+        assert_eq!(
+            map_iter.next(),
+            Some((Vec2::new(3500., 100.), Vec2::new(7000., 3000.)))
+        );
+        assert_eq!(
+            map_iter.next(),
+            Some((Vec2::new(7000., 3000.), Vec2::new(0., 3000.)))
+        );
+        assert_eq!(map_iter.next(), None);
     }
 }

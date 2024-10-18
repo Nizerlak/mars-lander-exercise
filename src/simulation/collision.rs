@@ -9,8 +9,39 @@ mod defaults {
 }
 
 pub struct Terrain {
-    pub x: Vec<f64>,
-    pub y: Vec<f64>,
+    max_x: f64,
+    max_y: f64,
+    x: Vec<f64>,
+    y: Vec<f64>,
+}
+
+impl Terrain {
+    pub fn iter_segments<'a>(&'a self) -> impl Iterator<Item = (Vec2, Vec2)> + 'a {
+        MapIterator::new(
+            self.max_x,
+            self.max_y,
+            self.x.iter().copied(),
+            self.y.iter().copied(),
+        )
+    }
+
+    pub fn iter_points<'a>(&'a self) -> impl Iterator<Item = Vec2> + 'a {
+        self.x.iter().zip(&self.y).map(|(x, y)| Vec2::new(*x, *y))
+    }
+
+    pub fn new(max_x: f64, max_y: f64, x: Vec<f64>, y: Vec<f64>) -> Self {
+        assert_eq!(x.len(), y.len());
+        assert!(x.len() >= 2);
+        Self { max_x, max_y, x, y }
+    }
+
+    pub fn with_default_limits(x: Vec<f64>, y: Vec<f64>) -> Self {
+        Self::new(defaults::MAX_X, defaults::MAX_Y, x, y)
+    }
+
+    pub fn max_y(&self) -> f64 {
+        self.max_y
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -40,8 +71,6 @@ pub enum Landing {
 }
 
 pub struct CollisionChecker {
-    max_x: f64,
-    max_y: f64,
     max_vertical_speed: f64,
     max_horizontal_speed: f64,
     angle_step: f64,
@@ -50,8 +79,6 @@ pub struct CollisionChecker {
 impl Default for CollisionChecker {
     fn default() -> Self {
         Self {
-            max_x: defaults::MAX_X,
-            max_y: defaults::MAX_Y,
             max_vertical_speed: defaults::MAX_VERTICAL_SPEED,
             max_horizontal_speed: defaults::MAX_HORIZONTAL_SPEED,
             angle_step: defaults::ANGLE_STEP,
@@ -59,18 +86,21 @@ impl Default for CollisionChecker {
     }
 }
 
-struct MapIterator<'a> {
+pub struct MapIterator<'a> {
     previous_point: Vec2,
     map_iter: Box<dyn Iterator<Item = Vec2> + 'a>,
 }
 
 impl<'a> MapIterator<'a> {
-    fn new(max_x: f64, max_y: f64, terrain: &'a Terrain) -> Self {
-        let map_iter = terrain
-            .x
-            .iter()
-            .zip(terrain.y.iter())
-            .map(|(&x, &y)| Vec2::new(x, y))
+    pub fn new(
+        max_x: f64,
+        max_y: f64,
+        x: impl Iterator<Item = f64> + 'a,
+        y: impl Iterator<Item = f64> + 'a,
+    ) -> Self {
+        let map_iter = x
+            .zip(y)
+            .map(|(x, y)| Vec2::new(x, y))
             .chain(std::iter::once(Vec2::new(max_x, max_y)))
             .chain(std::iter::once(Vec2::new(0., max_y)));
         Self {
@@ -92,10 +122,6 @@ impl Iterator for MapIterator<'_> {
 }
 
 impl CollisionChecker {
-    fn iter_map<'a>(&self, terrain: &'a Terrain) -> MapIterator<'a> {
-        MapIterator::new(self.max_x, self.max_y, terrain)
-    }
-
     pub fn check(
         &self,
         terrain: &Terrain,
@@ -103,20 +129,24 @@ impl CollisionChecker {
         current_state: &LanderState,
     ) -> Option<((f64, f64), Landing)> {
         let mut dist = 0.;
-        for terrain_segment in self.iter_map(terrain) {
+        for terrain_segment in terrain.iter_segments() {
             let lander_path_segment = (
                 Vec2::new(previous_state.x, previous_state.y),
                 Vec2::new(current_state.x, current_state.y),
             );
 
             if let Some(collision_point) = check_collision(terrain_segment, lander_path_segment) {
-                let collision_distance = dist+distance(terrain_segment.0, collision_point);
+                let collision_distance = dist + distance(terrain_segment.0, collision_point);
                 // non-flat terrain
                 let colision_state = if terrain_segment.0.y != terrain_segment.1.y {
-                    Landing::WrongTerrain { dist: collision_distance }
-                } else if terrain_segment.0.y >= self.max_y {
+                    Landing::WrongTerrain {
+                        dist: collision_distance,
+                    }
+                } else if terrain_segment.0.y >= terrain.max_y() {
                     //ceiling
-                    Landing::WrongTerrain { dist: collision_distance }
+                    Landing::WrongTerrain {
+                        dist: collision_distance,
+                    }
                 } else if current_state.angle != 0. {
                     let error_abs = current_state.angle.abs();
                     Landing::NotVertical {
@@ -140,17 +170,9 @@ impl CollisionChecker {
                 };
                 return Some(((collision_point.x, collision_point.y), colision_state));
             }
-            dist += distance(terrain_segment.0,terrain_segment.1);
+            dist += distance(terrain_segment.0, terrain_segment.1);
         }
         None
-    }
-
-    pub fn with_max_x(self, max_x: f64) -> Self {
-        Self { max_x, ..self }
-    }
-
-    pub fn with_max_y(self, max_y: f64) -> Self {
-        Self { max_y, ..self }
     }
 
     pub fn with_max_vertical_speed(self, max_vertical_speed: f64) -> Self {
@@ -172,8 +194,8 @@ impl CollisionChecker {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Vec2 {
-    x: f64,
-    y: f64,
+    pub x: f64,
+    pub y: f64,
 }
 
 impl Vec2 {
@@ -252,7 +274,7 @@ fn check_collision(segment_a: (Vec2, Vec2), segment_b: (Vec2, Vec2)) -> Option<V
     }
 }
 
-fn distance(a: Vec2, b: Vec2) -> f64 {
+pub fn distance(a: Vec2, b: Vec2) -> f64 {
     (a.x - b.x).hypot(a.y - b.y)
 }
 
@@ -261,16 +283,11 @@ mod collision_checker_tests {
     use super::*;
 
     fn terrain() -> Terrain {
-        Terrain {
-            x: vec![0., 3500., 7000.],
-            y: vec![100., 100., 150.],
-        }
+        Terrain::new(7000., 3000., vec![0., 3500., 7000.], vec![100., 100., 150.])
     }
 
     fn checker() -> CollisionChecker {
         CollisionChecker::default()
-            .with_max_x(7000.)
-            .with_max_y(3000.)
             .with_max_vertical_speed(40.)
             .with_max_horizontal_speed(20.)
     }
@@ -359,7 +376,7 @@ mod collision_checker_tests {
             checker()
                 .check(&terrain(), &previous_state, &current_state)
                 .unwrap(),
-            (_, Landing::WrongTerrain{..})
+            (_, Landing::WrongTerrain { .. })
         ));
     }
 
@@ -498,61 +515,61 @@ mod collision_tests {
 
     #[test]
     fn touching_not_parallel() {
-        let Vec2{x, y} = check(((1., 5.), (2., 2.)), ((0., 0.), (3., 3.))).unwrap();
+        let Vec2 { x, y } = check(((1., 5.), (2., 2.)), ((0., 0.), (3., 3.))).unwrap();
         assert_eq!(x, 2.);
         assert_eq!(y, 2.);
     }
 
     #[test]
     fn touching_not_parallel2() {
-        let Vec2{x, y} = check(((2., 2.), (1., 5.)), ((0., 0.), (3., 3.))).unwrap();
+        let Vec2 { x, y } = check(((2., 2.), (1., 5.)), ((0., 0.), (3., 3.))).unwrap();
         assert_eq!(x, 2.);
         assert_eq!(y, 2.);
     }
 
     #[test]
     fn crossing() {
-        let Vec2{x, y} = check(((2., 5.), (2., -2.)), ((0., 0.), (3., 3.))).unwrap();
+        let Vec2 { x, y } = check(((2., 5.), (2., -2.)), ((0., 0.), (3., 3.))).unwrap();
         assert_eq!(x, 2.);
         assert_eq!(y, 2.);
     }
 
     #[test]
     fn direction_independent() {
-        let Vec2{x, y} = check(((2., 5.), (2., -2.)), ((0., 0.), (3., 3.))).unwrap();
+        let Vec2 { x, y } = check(((2., 5.), (2., -2.)), ((0., 0.), (3., 3.))).unwrap();
         assert_eq!(x, 2.);
         assert_eq!(y, 2.);
 
-        let Vec2{x, y} = check(((2., 5.), (2., -2.)), ((3., 3.), (0., 0.))).unwrap();
+        let Vec2 { x, y } = check(((2., 5.), (2., -2.)), ((3., 3.), (0., 0.))).unwrap();
         assert_eq!(x, 2.);
         assert_eq!(y, 2.);
 
-        let Vec2{x, y} = check(((2., -2.), (2., 5.)), ((0., 0.), (3., 3.))).unwrap();
+        let Vec2 { x, y } = check(((2., -2.), (2., 5.)), ((0., 0.), (3., 3.))).unwrap();
         assert_eq!(x, 2.);
         assert_eq!(y, 2.);
 
-        let Vec2{x, y} = check(((2., 5.), (2., -2.)), ((0., 0.), (3., 3.))).unwrap();
+        let Vec2 { x, y } = check(((2., 5.), (2., -2.)), ((0., 0.), (3., 3.))).unwrap();
         assert_eq!(x, 2.);
         assert_eq!(y, 2.);
     }
 
     #[test]
     fn collinear_touching() {
-        let Vec2{x, y} = check(((-3., 1.), (1., 1.)), ((1., 1.), (3., 1.))).unwrap();
+        let Vec2 { x, y } = check(((-3., 1.), (1., 1.)), ((1., 1.), (3., 1.))).unwrap();
         assert_eq!(x, 1.);
         assert_eq!(y, 1.);
     }
 
     #[test]
     fn collinear_overlaping() {
-        let Vec2{x, y} = check(((-2., 1.), (2., 1.)), ((1., 1.), (3., 1.))).unwrap();
+        let Vec2 { x, y } = check(((-2., 1.), (2., 1.)), ((1., 1.), (3., 1.))).unwrap();
         assert_eq!(x, 1.);
         assert_eq!(y, 1.);
     }
 
     #[test]
     fn collinear_overlaping2() {
-        let Vec2{x, y} = check(((-2., 1.), (5., 1.)), ((1., 1.), (3., 1.))).unwrap();
+        let Vec2 { x, y } = check(((-2., 1.), (5., 1.)), ((1., 1.), (3., 1.))).unwrap();
         assert_eq!(x, 1.);
         assert_eq!(y, 1.);
     }
@@ -562,17 +579,14 @@ mod collision_tests {
 mod map_iterator_tests {
     use super::*;
 
-    fn terrain() -> Terrain {
-        Terrain {
-            x: vec![0., 3500.],
-            y: vec![100., 100.],
-        }
-    }
-
     #[test]
     fn map_iterator_basic() {
-        let terrain = terrain();
-        let mut map_iter = MapIterator::new(7000., 3000., &terrain);
+        let mut map_iter = MapIterator::new(
+            7000.,
+            3000.,
+            [0f64, 3500.].iter().copied(),
+            [100., 100.].iter().copied(),
+        );
 
         assert_eq!(
             map_iter.next().unwrap(),
@@ -595,11 +609,7 @@ mod map_iterator_tests {
 
     #[test]
     fn map_iterator_empty_terrain() {
-        let terrain = Terrain {
-            x: vec![],
-            y: vec![],
-        };
-        let mut map_iter = MapIterator::new(7000., 3000., &terrain);
+        let mut map_iter = MapIterator::new(7000., 3000., std::iter::empty(), std::iter::empty());
 
         assert_eq!(
             map_iter.next(),
@@ -614,11 +624,8 @@ mod map_iterator_tests {
 
     #[test]
     fn map_iterator_single_point_terrain() {
-        let terrain = Terrain {
-            x: vec![3500.],
-            y: vec![100.],
-        };
-        let mut map_iter = MapIterator::new(7000., 3000., &terrain);
+        let mut map_iter =
+            MapIterator::new(7000., 3000., std::iter::once(3500.), std::iter::once(100.));
 
         assert_eq!(
             map_iter.next(),

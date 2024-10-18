@@ -106,8 +106,11 @@ impl LanderRunner {
                 picked_any = true;
                 let cmd = command_provider
                     .get_cmd(id, self.iteration_id)
-                    .or_else(||command_provider.get_last_cmd(id))
-                    .ok_or(Error::CommandGetError { id, sub_id: self.iteration_id })?;
+                    .or_else(|| command_provider.get_last_cmd(id))
+                    .ok_or(Error::CommandGetError {
+                        id,
+                        sub_id: self.iteration_id,
+                    })?;
                 let mut new_lander_state = self
                     .physics
                     .iterate(lander.clone(), cmd)

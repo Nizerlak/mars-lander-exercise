@@ -122,11 +122,8 @@ async fn main() {
 async fn handle_terrain(State(state): State<AppState>) -> Json<Value> {
     let app = state.state.lock().unwrap();
     let terrain = app.get_terrain();
-    let v = terrain
-        .x
-        .iter()
-        .zip(terrain.y.iter())
-        .map(|(x, y)| vec![x, y])
+    let v = terrain.iter_points()
+        .map(|simulation::Vec2{x, y}| vec![x, y])
         .collect::<Vec<_>>();
     Json(serde_json::to_value(v).unwrap())
 }

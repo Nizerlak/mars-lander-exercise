@@ -76,7 +76,7 @@ fn parse_terrain(terrain_array: &JsonValue) -> Result<Terrain, String> {
                 Ok::<(Vec<f64>, Vec<f64>), String>((xs, ys))
             },
         )
-        .map(|(x, y)| Terrain { x, y })
+        .map(|(x, y)| Terrain::with_default_limits(x, y))
 }
 
 fn parse_lander(json: &JsonValue) -> Result<LanderState, String> {

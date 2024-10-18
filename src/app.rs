@@ -53,24 +53,22 @@ impl App {
     }
 
     pub fn next_population(&mut self) -> Result<(), String> {
-        let fitness = self.fitness_calculator.calculate_fitness(
-            &self
-                .lander_runner
-                .current_landers_states()
-                .map(|l| (l.x, l.y))
-                .collect(),
-            &self
-                .lander_runner
-                .current_flight_states()
-                .map(|f| {
-                    if let FlightState::Landed(l) = f {
-                        Ok(l.clone())
-                    } else {
-                        Err(format!("Lander not landed: {f:?}"))
-                    }
-                })
-                .collect::<Result<Vec<_>, String>>()?,
-        ).ok_or("Failed to calculate fitness")?;
+        let fitness = self
+            .fitness_calculator
+            .calculate_fitness(
+                &self
+                    .lander_runner
+                    .current_flight_states()
+                    .map(|f| {
+                        if let FlightState::Landed(l) = f {
+                            Ok(l.clone())
+                        } else {
+                            Err(format!("Lander not landed: {f:?}"))
+                        }
+                    })
+                    .collect::<Result<Vec<_>, String>>()?,
+            )
+            .ok_or("Failed to calculate fitness")?;
         self.solver.new_generation(fitness.iter().copied())?;
         self.current_fitness = fitness;
         self.population_id += 1;
@@ -125,16 +123,14 @@ impl App {
         self.population_id
     }
 
-    fn target_from_terrain(terrain: &Terrain) -> Option<((f64, f64), f64)> {
-        for (x, y) in terrain
-            .x
-            .as_slice()
-            .windows(2)
-            .zip(terrain.y.as_slice().windows(2))
-        {
-            if y[0] == y[1] {
-                return Some(((x[0], x[1]), y[0]));
+    fn target_from_terrain(terrain: &Terrain) -> Option<(f64, f64)> {
+        let mut dist = 0.;
+        for (p1, p2) in terrain.iter_segments() {
+            let new_dist = distance(p1, p2);
+            if p1.y == p2.y {
+                return Some((dist, dist + new_dist));
             }
+            dist += new_dist;
         }
         None
     }

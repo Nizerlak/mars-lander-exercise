@@ -4,7 +4,6 @@ use rand::{seq::SliceRandom, Rng};
 
 type Angle = i32;
 type Thrust = i32;
-type Point = (f64, f64);
 
 const ANGLE_RANGE: RangeInclusive<Angle> = -90..=90;
 const THRUST_RANGE: RangeInclusive<Thrust> = 0..=4;
@@ -58,7 +57,7 @@ pub struct Solver {
 }
 
 pub struct FitnessCalculator {
-    target: ((f64, f64), f64),
+    target: (f64, f64),
     landing_bias: f64,
 }
 
@@ -99,12 +98,6 @@ fn crossed(
             (x, y)
         });
     Ok((x, y))
-}
-
-fn normalized(v: impl Iterator<Item = f64> + Clone) -> Option<impl Iterator<Item = f64>> {
-    let max = v.clone().map(|v| v.abs()).max_by(|a, b| a.total_cmp(b))?;
-    let max = if max == 0. { 1. } else { max };
-    Some(v.map(move |v| v / max))
 }
 
 fn accumulated(
@@ -300,58 +293,59 @@ impl Solver {
 }
 
 impl FitnessCalculator {
-    pub fn new(target: ((f64, f64), f64), landing_bias: f64) -> Self {
+    pub fn new(target: (f64, f64), landing_bias: f64) -> Self {
         Self {
             target,
             landing_bias,
         }
     }
 
-    pub fn calculate_fitness(
-        &self,
-        landing_points: &Vec<Point>,
-        landing_results: &Vec<super::Landing>,
-    ) -> Option<Vec<f64>> {
-        let distances =
-            normalized(landing_points.iter().map(|p| self.dist_to_target(*p)))?.map(|v| 1. - v);
-
+    pub fn calculate_fitness(&self, landing_results: &Vec<super::Landing>) -> Option<Vec<f64>> {
         use crate::Landing;
         let some_or_max = |a: Option<f64>, er: f64| Some(a.map_or(er, |v| v.max(er)));
         let landed_normalized = |error: f64, max: Option<f64>| {
             self.landing_bias + (1. - self.landing_bias) * error / max.unwrap()
         };
 
-        let err_max =
+        let dist_points = |dist: f64| {
+            (self.target.0 - dist)
+                .abs()
+                .min((self.target.1 - dist).abs())
+        };
+
+        let (err_max, dist_max) =
             landing_results
                 .iter()
-                .fold(None, |err, landing| match landing {
-                    &Landing::NotVertical{ error_rel, .. } | &Landing::TooFastHorizontal{ error_rel, .. } | &Landing::TooFastVertical{ error_rel,.. } => some_or_max(err,error_rel),
-                    _ => err,
-                });
+                .fold(
+                    (None, None),
+                    |(landing_err_max, dist_max), landing| match landing {
+                        &Landing::NotVertical { error_rel, .. }
+                        | &Landing::TooFastHorizontal { error_rel, .. }
+                        | &Landing::TooFastVertical { error_rel, .. } => {
+                            (some_or_max(landing_err_max, error_rel), dist_max)
+                        }
+                        &Landing::WrongTerrain { dist } => {
+                            (landing_err_max, some_or_max(dist_max, dist_points(dist)))
+                        }
+                        _ => (landing_err_max, dist_max),
+                    },
+                );
         Some(
             landing_results
                 .iter()
-                .zip(distances)
-                .map(|(result, dist_points)| match result {
+                .map(|result| match result {
                     &Landing::Correct => 1.,
-                    &Landing::NotVertical{ error_rel, .. } | &Landing::TooFastHorizontal{ error_rel, .. } | &Landing::TooFastVertical{ error_rel, .. } => landed_normalized(error_rel, err_max),
-                    &Landing::WrongTerrain{..} => dist_points * self.landing_bias,
+                    &Landing::NotVertical { error_rel, .. }
+                    | &Landing::TooFastHorizontal { error_rel, .. }
+                    | &Landing::TooFastVertical { error_rel, .. } => {
+                        landed_normalized(error_rel, err_max)
+                    }
+                    &Landing::WrongTerrain { dist } => {
+                        (1. - dist_points(dist) / dist_max.unwrap()) * self.landing_bias
+                    }
                 })
                 .collect(),
         )
-    }
-
-    fn dist_to_target(&self, (x, y): Point) -> f64 {
-        let ((tx1, tx2), ty) = &self.target;
-        let dist =
-            |(a1, a2): Point, (b1, b2): Point| ((a1 - b1).powi(2) + (a2 - b2).powi(2)).sqrt();
-        if x < *tx1 {
-            dist((x, y), (*tx1, *ty))
-        } else if x > *tx2 {
-            dist((x, y), (*tx2, *ty))
-        } else {
-            (ty - y).abs()
-        }
     }
 }
 

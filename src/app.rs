@@ -75,24 +75,21 @@ impl App {
         Ok(())
     }
 
-    pub fn run(&mut self) -> Result<ExecutionStatus, String> {
+    pub fn run(&mut self) -> Result<(), String> {
         self.lander_runner
             .reinitialize(self.initial_lander_state.clone());
         self.flight_histories.iter_mut().for_each(|h| {
             *h = LanderHistory::with_initial_state(self.initial_lander_state.clone())
         });
-        let res = loop {
-            match self
-                .lander_runner
-                .iterate(&self.solver, &self.terrain)
-                .map_err(|e| e.to_string())
-            {
-                Ok(ExecutionStatus::InProgress) => self.save_last_lander_states_in_flight(),
-                e => break e,
-            }
-        };
+        while let ExecutionStatus::InProgress = self
+            .lander_runner
+            .iterate(&self.solver, &self.terrain)
+            .map_err(|e| e.to_string())?
+        {
+            self.save_last_lander_states_in_flight();
+        }
         self.save_last_lander_states();
-        res
+        Ok(())
     }
 
     pub fn get_routes(&self) -> impl Iterator<Item = impl Iterator<Item = LanderState> + '_> + '_ {

@@ -83,7 +83,7 @@ impl App {
         self.flight_histories.iter_mut().for_each(|h| {
             *h = LanderHistory::with_initial_state(self.initial_lander_state.clone())
         });
-        let mut population: Vec<_> = self.solver.iter_accumulated_population().cloned().collect();
+        let mut population: Vec<_> = self.solver.iter_accumulated_population().collect();
         while let ExecutionStatus::InProgress = self
             .lander_runner
             .iterate(&mut population, &self.terrain)
@@ -111,7 +111,7 @@ impl App {
         self.solver.iter_population()
     }
 
-    pub fn get_population_accumulated(&self) -> impl Iterator<Item = &Chromosome> + '_ {
+    pub fn get_population_accumulated(&self) -> impl Iterator<Item = Chromosome> + '_ {
         self.solver.iter_accumulated_population()
     }
 

@@ -157,11 +157,7 @@ async fn handle_population(State(AppState { state }): State<AppState>) -> Json<V
         routes,
         fitness: app.get_current_fitness().collect(),
         commands: app.get_population().cloned().map(Into::into).collect(),
-        commands_accumulated: app
-            .get_population_accumulated()
-            .cloned()
-            .map(Into::into)
-            .collect(),
+        commands_accumulated: app.get_population_accumulated().map(Into::into).collect(),
     };
     Json(serde_json::to_value(population).unwrap())
 }

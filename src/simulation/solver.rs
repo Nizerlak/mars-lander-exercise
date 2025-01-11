@@ -48,7 +48,6 @@ pub struct Solver {
     mutation_prob: f64,
     initial_angle: Angle,
     initial_thrust: Thrust,
-    accumulated_population: Vec<Chromosome>,
 }
 
 pub struct FitnessCalculator {
@@ -183,18 +182,12 @@ impl Solver {
         let population: Vec<_> = (0..settings.population_size)
             .map(|_| Chromosome::new_random(settings.chromosome_size))
             .collect();
-        let accumulated_population = Self::accumulated_population(
-            settings.initial_angle,
-            settings.initial_thrust,
-            &population,
-        );
         Ok(Self {
             population,
             elitism: settings.elitism,
             mutation_prob: settings.mutation_prob,
             initial_angle: settings.initial_angle,
             initial_thrust: settings.initial_thrust,
-            accumulated_population,
         })
     }
 
@@ -205,8 +198,6 @@ impl Solver {
         let mut new_pop = self.mate(self.population.iter().collect(), n_children)?;
         new_pop.extend(parents.iter().map(|c| (**c).clone()));
         self.population = new_pop;
-        self.accumulated_population =
-            Self::accumulated_population(self.initial_angle, self.initial_thrust, &self.population);
         assert_eq!(len_population_before, self.population.len());
         Ok(())
     }
@@ -240,35 +231,27 @@ impl Solver {
         Ok(new_population)
     }
 
-    fn accumulated_population(
-        initial_angle: i32,
-        initial_thrust: i32,
-        population: &[Chromosome],
-    ) -> Vec<Chromosome> {
-        population.iter().fold(
-            Vec::new(),
-            |mut population, Chromosome { angles, thrusts }| {
-                population.push(Chromosome {
-                    angles: accumulated(initial_angle, angles.iter().copied(), clamp!(ANGLE_RANGE))
-                        .collect(),
-                    thrusts: accumulated(
-                        initial_thrust,
-                        thrusts.iter().copied(),
-                        clamp!(THRUST_RANGE),
-                    )
-                    .collect(),
-                });
-                population
-            },
-        )
+    pub fn iter_accumulated_population(&self) -> impl Iterator<Item = Chromosome> + '_ {
+        self.population
+            .iter()
+            .map(|Chromosome { angles, thrusts }| Chromosome {
+                angles: accumulated(
+                    self.initial_angle,
+                    angles.iter().copied(),
+                    clamp!(ANGLE_RANGE),
+                )
+                .collect(),
+                thrusts: accumulated(
+                    self.initial_thrust,
+                    thrusts.iter().copied(),
+                    clamp!(THRUST_RANGE),
+                )
+                .collect(),
+            })
     }
 
     pub fn iter_population(&self) -> impl Iterator<Item = &Chromosome> {
         self.population.iter()
-    }
-
-    pub fn iter_accumulated_population(&self) -> impl Iterator<Item = &Chromosome> {
-        self.accumulated_population.iter()
     }
 }
 

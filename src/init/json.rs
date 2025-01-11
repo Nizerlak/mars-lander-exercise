@@ -51,7 +51,8 @@ pub fn parse_sim(sim_file_path: &String) -> Result<(LanderState, Terrain), Strin
 
 fn read_json(file_path: &String) -> Result<JsonValue, String> {
     let mut file_content = String::new();
-    let mut file = File::open(file_path).map_err(|e| format!("Error while opening file: {e}"))?;
+    let mut file =
+        File::open(file_path).map_err(|e| format!("Error while opening file {file_path}: {e}"))?;
 
     file.read_to_string(&mut file_content)
         .map_err(|e| format!("Failed to read file: {e}"))?;

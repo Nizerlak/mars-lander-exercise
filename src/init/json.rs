@@ -35,7 +35,6 @@ pub fn parse_settings(settings_file_path: &String) -> Result<Settings, String> {
         chromosome_size: get_json!(settings_json, "ChromosomeSize", as_usize),
         elitism: get_json!(settings_json, "Elitism", as_f64),
         mutation_prob: get_json!(settings_json, "MutationProb", as_f64),
-        landing_bias: get_json!(settings_json, "LandingBias", as_f64),
     };
     Ok(settings)
 }

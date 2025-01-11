@@ -6,7 +6,6 @@ pub struct App {
     initial_lander_state: LanderState,
     flight_histories: Vec<LanderHistory>,
     solver: Solver,
-    fitness_calculator: FitnessCalculator,
     current_fitness: Vec<f64>,
     population_id: usize,
 }
@@ -26,10 +25,6 @@ impl App {
             initial_thrust: initial_lander_state.power,
         };
         let solver = Solver::try_new(solver_settings)?;
-        let fitness_calculator = FitnessCalculator::new(
-            Self::target_from_terrain(&terrain).ok_or("Cannot get target from terrain")?,
-            settings.landing_bias,
-        );
         let lander_runner = LanderRunner::new(
             initial_lander_state.clone(),
             settings.population_size,
@@ -48,29 +43,26 @@ impl App {
             initial_lander_state,
             flight_histories,
             solver,
-            fitness_calculator,
             current_fitness: vec![0f64; settings.population_size],
             population_id: 0,
         })
     }
 
     pub fn next_population(&mut self) -> Result<(), String> {
-        let fitness = self
-            .fitness_calculator
-            .calculate_fitness(
-                &self
-                    .lander_runner
-                    .current_flight_states()
-                    .map(|f| {
-                        if let FlightState::Landed(l) = f {
-                            Ok(l.clone())
-                        } else {
-                            Err(format!("Lander not landed: {f:?}"))
-                        }
-                    })
-                    .collect::<Result<Vec<_>, String>>()?,
-            )
-            .ok_or("Failed to calculate fitness")?;
+        let fitness = calculate_fitness(
+            &self
+                .lander_runner
+                .current_flight_states()
+                .map(|f| {
+                    if let FlightState::Landed(l) = f {
+                        Ok(l.clone())
+                    } else {
+                        Err(format!("Lander not landed: {f:?}"))
+                    }
+                })
+                .collect::<Result<Vec<_>, String>>()?,
+        )
+        .ok_or("Failed to calculate fitness")?;
         self.solver.new_generation(fitness.iter().copied())?;
         self.current_fitness = fitness;
         self.population_id += 1;
@@ -121,18 +113,6 @@ impl App {
 
     pub fn get_population_id(&self) -> usize {
         self.population_id
-    }
-
-    fn target_from_terrain(terrain: &Terrain) -> Option<(f64, f64)> {
-        let mut dist = 0.;
-        for (p1, p2) in terrain.iter_segments() {
-            let new_dist = distance(p1, p2);
-            if p1.y == p2.y {
-                return Some((dist, dist + new_dist));
-            }
-            dist += new_dist;
-        }
-        None
     }
 
     fn save_last_lander_states_in_flight(&mut self) {

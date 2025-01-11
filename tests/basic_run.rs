@@ -12,7 +12,6 @@ fn simple_app() -> App {
             chromosome_size: 50,
             elitism: 0.2,
             mutation_prob: 0.01,
-            landing_bias: 0.3,
         },
     )
     .unwrap()

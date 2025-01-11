@@ -24,7 +24,6 @@ pub struct Settings {
     pub chromosome_size: usize,
     pub elitism: f64,
     pub mutation_prob: f64,
-    pub landing_bias: f64,
 }
 
 pub struct SolverSettings {
@@ -49,8 +48,6 @@ pub struct Solver {
     initial_angle: Angle,
     initial_thrust: Thrust,
 }
-
-pub struct FitnessCalculator {}
 
 fn new_random_angle() -> Angle {
     rand::thread_rng().gen_range(ANGLE_STEP_RANGE)
@@ -298,33 +295,27 @@ fn get_max_errors<'a>(landing_results: impl Iterator<Item = &'a super::Landing>)
     })
 }
 
-impl FitnessCalculator {
-    pub fn new(_target: (f64, f64), _landing_bias: f64) -> Self {
-        Self {}
-    }
+pub fn calculate_fitness(landing_results: &[super::Landing]) -> Option<Vec<f64>> {
+    use crate::Landing;
+    let max_errors = get_max_errors(landing_results.iter());
+    let base_score = |result: &Landing| {
+        Some(match result {
+            Landing::Correct => 0.,
+            Landing::NotVertical { error_abs, .. } => error_abs / max_errors.angle_error?,
+            Landing::TooFastHorizontal { error_abs, .. } => {
+                error_abs / max_errors.horizontal_speed_error?
+            }
+            Landing::TooFastVertical { error_abs, .. } => {
+                error_abs / max_errors.vertical_speed_error?
+            }
+            Landing::WrongTerrain { dist } => dist / max_errors.terrain_dist_error?,
+        })
+    };
 
-    pub fn calculate_fitness(&self, landing_results: &[super::Landing]) -> Option<Vec<f64>> {
-        use crate::Landing;
-        let max_errors = get_max_errors(landing_results.iter());
-        let base_score = |result: &Landing| {
-            Some(match result {
-                Landing::Correct => 0.,
-                Landing::NotVertical { error_abs, .. } => error_abs / max_errors.angle_error?,
-                Landing::TooFastHorizontal { error_abs, .. } => {
-                    error_abs / max_errors.horizontal_speed_error?
-                }
-                Landing::TooFastVertical { error_abs, .. } => {
-                    error_abs / max_errors.vertical_speed_error?
-                }
-                Landing::WrongTerrain { dist } => dist / max_errors.terrain_dist_error?,
-            })
-        };
-
-        landing_results
-            .iter()
-            .map(|result| Some((1. - base_score(result)?) * landing_state_score(result)))
-            .collect()
-    }
+    landing_results
+        .iter()
+        .map(|result| Some((1. - base_score(result)?) * landing_state_score(result)))
+        .collect()
 }
 
 #[cfg(test)]

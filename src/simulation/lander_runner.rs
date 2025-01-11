@@ -77,7 +77,7 @@ impl LanderRunner {
 
     pub fn iterate(
         &mut self,
-        command_provider: &impl CommandProvider,
+        population: &mut [Chromosome],
         terrain: &Terrain,
     ) -> Result<ExecutionStatus, Error> {
         assert_eq!(self.states.len(), self.landers.len());
@@ -92,9 +92,13 @@ impl LanderRunner {
         {
             if let FlightState::Flying = *flight_state {
                 picked_any = true;
-                let cmd = command_provider
-                    .get_cmd(id, self.iteration_id)
-                    .or_else(|| command_provider.get_last_cmd(id))
+                let cmd = population
+                    .get_mut(id)
+                    .and_then(|chromosome| {
+                        chromosome
+                            .get_cmd(self.iteration_id)
+                            .or(chromosome.get_last_cmd())
+                    })
                     .ok_or(Error::CommandGetError {
                         id,
                         sub_id: self.iteration_id,

@@ -8,24 +8,24 @@ pub(crate) mod defaults {
 }
 
 #[derive(Clone, Debug)]
-pub struct Thrust {
+pub struct Command {
     angle: f64,
     power: i32,
 }
 
-impl Default for Thrust {
+impl Default for Command {
     fn default() -> Self {
         Self::zero()
     }
 }
 
-impl Thrust {
+impl Command {
     pub fn new(angle: f64, power: i32) -> Self {
         Self { angle, power }
     }
 }
 
-impl Thrust {
+impl Command {
     fn into_vector(self) -> (f64, f64) {
         let angle = (self.angle + 90.).to_radians();
         let (sin, cos) = angle.sin_cos();
@@ -84,7 +84,7 @@ impl LanderState {
 
 #[derive(Debug)]
 pub enum SimulationError {
-    InvalidThrust(Thrust),
+    InvalidThrust(Command),
 }
 
 pub struct Physics {
@@ -135,7 +135,7 @@ impl Physics {
     pub fn iterate(
         &self,
         mut lander: LanderState,
-        cmd: Thrust,
+        cmd: Command,
     ) -> Result<LanderState, SimulationError> {
         // validate cmd
         if !self.validate_thrust(&cmd) {
@@ -156,7 +156,7 @@ impl Physics {
         }
 
         // vectorize thrust
-        let (t_x, t_y) = Thrust {
+        let (t_x, t_y) = Command {
             angle: lander.angle,
             power: lander.power,
         }
@@ -178,7 +178,7 @@ impl Physics {
         Ok(lander)
     }
 
-    fn validate_thrust(&self, thrust: &Thrust) -> bool {
+    fn validate_thrust(&self, thrust: &Command) -> bool {
         thrust.angle.abs() <= self.angle_limit
             && thrust.power <= self.power_max
             && thrust.power >= 0
@@ -221,7 +221,7 @@ mod physics_tests {
                     .with_y(500.)
                     .with_x(500.)
                     .with_fuel(200),
-                Thrust {
+                Command {
                     angle: 16.,
                     power: 2,
                 },
@@ -235,7 +235,7 @@ mod physics_tests {
     fn free_fall() {
         let lander = LanderState::default().with_y(500.);
         let initial_x = lander.x;
-        let lander = Physics::default().iterate(lander, Thrust::zero()).unwrap();
+        let lander = Physics::default().iterate(lander, Command::zero()).unwrap();
         assert_feq(lander.x, initial_x);
         assert_close(lander.y, 498., 0.15);
     }
@@ -247,7 +247,7 @@ mod physics_tests {
         let lander = Physics::default()
             .iterate(
                 lander,
-                Thrust {
+                Command {
                     angle: 0.,
                     power: 4,
                 },
@@ -266,7 +266,7 @@ mod physics_tests {
             lander = Physics::default()
                 .iterate(
                     lander,
-                    Thrust {
+                    Command {
                         angle: 0.,
                         power: 4,
                     },
@@ -284,7 +284,7 @@ mod physics_tests {
         let lander = Physics::default()
             .iterate(
                 lander,
-                Thrust {
+                Command {
                     angle: 0.,
                     power: 1,
                 },

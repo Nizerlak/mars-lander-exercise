@@ -19,11 +19,6 @@ macro_rules! clamp {
 type AngleGenes = Vec<Angle>;
 type ThrustGenes = Vec<Thrust>;
 
-pub trait CommandProvider {
-    fn get_cmd(&self, id: usize, sub_id: usize) -> Option<super::Thrust>;
-    fn get_last_cmd(&self, id: usize) -> Option<super::Thrust>;
-}
-
 pub struct Settings {
     pub population_size: usize,
     pub chromosome_size: usize,
@@ -48,7 +43,7 @@ pub struct Chromosome {
 }
 
 pub struct Solver {
-    population: Vec<Chromosome>,
+    pub population: Vec<Chromosome>,
     elitism: f64,
     mutation_prob: f64,
     initial_angle: Angle,
@@ -119,15 +114,15 @@ impl Chromosome {
         }
     }
 
-    pub fn get_cmd(&self, id: usize) -> Option<super::Thrust> {
-        Some(super::Thrust::new(
+    pub fn get_cmd(&self, id: usize) -> Option<super::Command> {
+        Some(super::Command::new(
             *self.angles.get(id)? as f64,
             *self.thrusts.get(id)?,
         ))
     }
 
-    pub fn get_last_cmd(&self) -> Option<super::Thrust> {
-        Some(super::Thrust::new(
+    pub fn get_last_cmd(&self) -> Option<super::Command> {
+        Some(super::Command::new(
             *self.angles.last()? as f64,
             *self.thrusts.last()?,
         ))
@@ -171,16 +166,6 @@ impl Chromosome {
                 }
             });
         Some(())
-    }
-}
-
-impl CommandProvider for Solver {
-    fn get_cmd(&self, id: usize, sub_id: usize) -> Option<super::Thrust> {
-        self.accumulated_population.get(id)?.get_cmd(sub_id)
-    }
-
-    fn get_last_cmd(&self, id: usize) -> Option<super::Thrust> {
-        self.accumulated_population.get(id)?.get_last_cmd()
     }
 }
 

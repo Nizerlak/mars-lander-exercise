@@ -83,9 +83,10 @@ impl App {
         self.flight_histories.iter_mut().for_each(|h| {
             *h = LanderHistory::with_initial_state(self.initial_lander_state.clone())
         });
+        let mut population: Vec<_> = self.solver.iter_accumulated_population().cloned().collect();
         while let ExecutionStatus::InProgress = self
             .lander_runner
-            .iterate(&self.solver, &self.terrain)
+            .iterate(&mut population, &self.terrain)
             .map_err(|e| e.to_string())?
         {
             self.save_last_lander_states_in_flight();

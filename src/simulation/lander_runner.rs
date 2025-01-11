@@ -19,7 +19,6 @@ impl Display for Error {
 pub enum ExecutionStatus {
     InProgress,
     Finished,
-    ExecutionLimitReached,
 }
 
 #[derive(Debug, Clone)]
@@ -39,7 +38,6 @@ pub struct LanderRunner {
     landers: Vec<LanderState>,
     physics: Physics,
     collision_checker: CollisionChecker,
-    executions_left: Option<usize>,
     iteration_id: usize,
 }
 
@@ -55,15 +53,7 @@ impl LanderRunner {
             collision_checker,
             states: vec![FlightState::Flying; num_of_landers],
             landers: vec![initial_lander_state; num_of_landers],
-            executions_left: None,
             iteration_id: 0,
-        }
-    }
-
-    pub fn executions_limit(self, limit: usize) -> Self {
-        Self {
-            executions_left: Some(limit),
-            ..self
         }
     }
 
@@ -91,10 +81,6 @@ impl LanderRunner {
         terrain: &Terrain,
     ) -> Result<ExecutionStatus, Error> {
         assert_eq!(self.states.len(), self.landers.len());
-
-        if let Some(0) = self.executions_left {
-            return Ok(ExecutionStatus::ExecutionLimitReached);
-        }
 
         let mut picked_any = false;
 
@@ -130,9 +116,6 @@ impl LanderRunner {
         }
 
         if picked_any {
-            if let Some(ref mut exectuions_left) = self.executions_left {
-                *exectuions_left -= 1;
-            }
             self.iteration_id += 1;
             Ok(ExecutionStatus::InProgress)
         } else {

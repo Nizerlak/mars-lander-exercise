@@ -33,11 +33,52 @@ impl From<SimulationError> for Error {
     }
 }
 
+struct LanderStateCalculation {
+    physics: Physics,
+    collision_checker: CollisionChecker,
+}
+
+impl LanderStateCalculation {
+    pub fn new(physics: Physics, collision_checker: CollisionChecker) -> Self {
+        Self {
+            physics,
+            collision_checker,
+        }
+    }
+
+    pub fn calculate_new_lander_state(
+        &self,
+        terrain: &Terrain,
+        lander: &LanderState,
+        cmd: Command,
+    ) -> Result<(LanderState, FlightState), Error> {
+        let new_lander_state = self
+            .physics
+            .iterate(lander.clone(), cmd)
+            .map_err(<SimulationError as std::convert::Into<Error>>::into)?;
+        if let Some(((x, y), landing)) =
+            self.collision_checker
+                .check(terrain, lander, &new_lander_state)
+        {
+            Ok((
+                LanderState {
+                    x,
+                    y,
+                    ..new_lander_state
+                },
+                FlightState::Landed(landing),
+            ))
+        } else {
+            Ok((new_lander_state, FlightState::Flying))
+        }
+    }
+}
+
 pub struct LanderRunner {
     states: Vec<FlightState>,
     landers: Vec<LanderState>,
-    physics: Physics,
-    collision_checker: CollisionChecker,
+    lander_state_calculator: LanderStateCalculation,
+    angle_step: f64,
     iteration_id: usize,
 }
 
@@ -48,11 +89,12 @@ impl LanderRunner {
         physics: Physics,
         collision_checker: CollisionChecker,
     ) -> Self {
+        let angle_step = collision_checker.angle_step;
         Self {
-            physics,
-            collision_checker,
+            lander_state_calculator: LanderStateCalculation::new(physics, collision_checker),
             states: vec![FlightState::Flying; num_of_landers],
             landers: vec![initial_lander_state; num_of_landers],
+            angle_step,
             iteration_id: 0,
         }
     }
@@ -81,41 +123,48 @@ impl LanderRunner {
         terrain: &Terrain,
     ) -> Result<ExecutionStatus, Error> {
         assert_eq!(self.states.len(), self.landers.len());
+        assert_eq!(self.states.len(), population.len());
 
         let mut picked_any = false;
 
-        for (id, (lander, flight_state)) in self
+        for (id, ((lander, flight_state), angle_thrust)) in self
             .landers
             .iter_mut()
             .zip(self.states.iter_mut())
+            .zip(
+                population
+                    .iter_mut()
+                    .map(|chromosome| get_id_or_last(chromosome, self.iteration_id)),
+            )
             .enumerate()
         {
             if let FlightState::Flying = *flight_state {
                 picked_any = true;
-                let cmd = population
-                    .get_mut(id)
-                    .and_then(|chromosome| {
-                        chromosome
-                            .get_cmd(self.iteration_id)
-                            .or(chromosome.get_last_cmd())
-                    })
-                    .ok_or(Error::CommandGetError {
-                        id,
-                        sub_id: self.iteration_id,
-                    })?;
-                let mut new_lander_state = self
-                    .physics
-                    .iterate(lander.clone(), cmd)
-                    .map_err(<SimulationError as std::convert::Into<Error>>::into)?;
-                if let Some(((x, y), landing)) =
-                    self.collision_checker
-                        .check(terrain, lander, &new_lander_state)
-                {
-                    *flight_state = FlightState::Landed(landing);
-                    new_lander_state.x = x;
-                    new_lander_state.y = y;
-                }
+                let (angle, thrust) = angle_thrust.ok_or(Error::CommandGetError {
+                    id,
+                    sub_id: self.iteration_id,
+                })?;
+                let (new_lander_state, new_flight_state) =
+                    match self.lander_state_calculator.calculate_new_lander_state(
+                        terrain,
+                        lander,
+                        Command::new(*angle as f64, *thrust),
+                    )? {
+                        (_, FlightState::Landed(Landing::NotVertical { error_abs, .. }))
+                            if error_abs <= self.angle_step =>
+                        {
+                            *angle = 0;
+                            println!("Corrected angle for chromosome with id {id}");
+                            self.lander_state_calculator.calculate_new_lander_state(
+                                terrain,
+                                lander,
+                                Command::new(*angle as f64, *thrust),
+                            )? // recalculate for new angle
+                        }
+                        other => other,
+                    };
                 *lander = new_lander_state;
+                *flight_state = new_flight_state;
             }
         }
 
@@ -125,6 +174,19 @@ impl LanderRunner {
         } else {
             Ok(ExecutionStatus::Finished)
         }
+    }
+}
+fn get_id_or_last(chromosome: &mut Chromosome, index: usize) -> Option<(&mut i32, &mut i32)> {
+    if index < chromosome.angles.len() {
+        Some((
+            chromosome.angles.get_mut(index)?,
+            chromosome.thrusts.get_mut(index)?,
+        )) // Safe because we checked bounds
+    } else {
+        Some((
+            chromosome.angles.last_mut()?,
+            chromosome.thrusts.last_mut()?,
+        )) // Fallback to last_mut
     }
 }
 

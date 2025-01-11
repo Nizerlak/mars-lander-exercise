@@ -73,7 +73,7 @@ pub enum Landing {
 pub struct CollisionChecker {
     max_vertical_speed: f64,
     max_horizontal_speed: f64,
-    angle_step: f64,
+    pub angle_step: f64,
 }
 
 impl Default for CollisionChecker {

@@ -50,10 +50,7 @@ pub struct Solver {
     initial_thrust: Thrust,
 }
 
-pub struct FitnessCalculator {
-    target: (f64, f64),
-    landing_bias: f64,
-}
+pub struct FitnessCalculator {}
 
 fn new_random_angle() -> Angle {
     rand::thread_rng().gen_range(ANGLE_STEP_RANGE)
@@ -255,60 +252,78 @@ impl Solver {
     }
 }
 
+fn landing_state_score(state: &crate::Landing) -> f64 {
+    use crate::Landing;
+    match state {
+        Landing::Correct => 1.,
+        Landing::WrongTerrain { .. } => 0.3,
+        Landing::NotVertical { .. } => 0.9,
+        Landing::TooFastVertical { .. } => 0.7,
+        Landing::TooFastHorizontal { .. } => 0.5,
+    }
+}
+
+#[derive(Default)]
+struct MaxErrors {
+    angle_error: Option<f64>,
+    horizontal_speed_error: Option<f64>,
+    vertical_speed_error: Option<f64>,
+    terrain_dist_error: Option<f64>,
+}
+
+fn update_max(a: &mut Option<f64>, b: f64) {
+    *a = match a {
+        None => Some(b),
+        Some(existing) => Some(existing.max(b)),
+    };
+}
+
+fn get_max_errors<'a>(landing_results: impl Iterator<Item = &'a super::Landing>) -> MaxErrors {
+    landing_results.fold(MaxErrors::default(), |mut errors, landing_result| {
+        use super::Landing;
+        match landing_result {
+            Landing::NotVertical { error_abs, .. } => {
+                update_max(&mut errors.angle_error, *error_abs)
+            }
+            Landing::WrongTerrain { dist, .. } => update_max(&mut errors.terrain_dist_error, *dist),
+            Landing::TooFastHorizontal { error_abs, .. } => {
+                update_max(&mut errors.horizontal_speed_error, *error_abs)
+            }
+            Landing::TooFastVertical { error_abs, .. } => {
+                update_max(&mut errors.vertical_speed_error, *error_abs)
+            }
+            Landing::Correct => (),
+        };
+        errors
+    })
+}
+
 impl FitnessCalculator {
-    pub fn new(target: (f64, f64), landing_bias: f64) -> Self {
-        Self {
-            target,
-            landing_bias,
-        }
+    pub fn new(_target: (f64, f64), _landing_bias: f64) -> Self {
+        Self {}
     }
 
     pub fn calculate_fitness(&self, landing_results: &[super::Landing]) -> Option<Vec<f64>> {
         use crate::Landing;
-        let some_or_max = |a: Option<f64>, er: f64| Some(a.map_or(er, |v| v.max(er)));
-        let landed_normalized = |error: f64, max: Option<f64>| {
-            self.landing_bias + (1. - self.landing_bias) * error / max.unwrap()
+        let max_errors = get_max_errors(landing_results.iter());
+        let base_score = |result: &Landing| {
+            Some(match result {
+                Landing::Correct => 0.,
+                Landing::NotVertical { error_abs, .. } => error_abs / max_errors.angle_error?,
+                Landing::TooFastHorizontal { error_abs, .. } => {
+                    error_abs / max_errors.horizontal_speed_error?
+                }
+                Landing::TooFastVertical { error_abs, .. } => {
+                    error_abs / max_errors.vertical_speed_error?
+                }
+                Landing::WrongTerrain { dist } => dist / max_errors.terrain_dist_error?,
+            })
         };
 
-        let dist_points = |dist: f64| {
-            (self.target.0 - dist)
-                .abs()
-                .min((self.target.1 - dist).abs())
-        };
-
-        let (err_max, dist_max) =
-            landing_results
-                .iter()
-                .fold(
-                    (None, None),
-                    |(landing_err_max, dist_max), landing| match landing {
-                        &Landing::NotVertical { error_rel, .. }
-                        | &Landing::TooFastHorizontal { error_rel, .. }
-                        | &Landing::TooFastVertical { error_rel, .. } => {
-                            (some_or_max(landing_err_max, error_rel), dist_max)
-                        }
-                        &Landing::WrongTerrain { dist } => {
-                            (landing_err_max, some_or_max(dist_max, dist_points(dist)))
-                        }
-                        _ => (landing_err_max, dist_max),
-                    },
-                );
-        Some(
-            landing_results
-                .iter()
-                .map(|result| match result {
-                    &Landing::Correct => 1.,
-                    &Landing::NotVertical { error_rel, .. }
-                    | &Landing::TooFastHorizontal { error_rel, .. }
-                    | &Landing::TooFastVertical { error_rel, .. } => {
-                        landed_normalized(error_rel, err_max)
-                    }
-                    &Landing::WrongTerrain { dist } => {
-                        (1. - dist_points(dist) / dist_max.unwrap()) * self.landing_bias
-                    }
-                })
-                .collect(),
-        )
+        landing_results
+            .iter()
+            .map(|result| Some((1. - base_score(result)?) * landing_state_score(result)))
+            .collect()
     }
 }
 

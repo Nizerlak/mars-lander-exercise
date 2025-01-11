@@ -1,4 +1,4 @@
-use crate::{init, simulation::*};
+use crate::simulation::*;
 
 pub struct App {
     terrain: Terrain,
@@ -12,16 +12,8 @@ pub struct App {
 }
 
 impl App {
-    pub fn try_from_files_(
-        sim_file_path: &String,
-        settings_file_path: &String,
-    ) -> Result<Self, String> {
-        let (initial_lander_state, terrain) = init::json::parse_sim(sim_file_path)?;
-        let settings = init::json::parse_settings(settings_file_path)?;
-        Self::try_new(initial_lander_state, terrain, settings)
-    }
 
-    fn try_new(
+    pub fn try_new(
         initial_lander_state: LanderState,
         terrain: Terrain,
         settings: Settings,

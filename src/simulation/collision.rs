@@ -58,15 +58,12 @@ pub enum Landing {
     },
     NotVertical {
         error_abs: f64,
-        error_rel: f64,
     },
     TooFastVertical {
         error_abs: f64,
-        error_rel: f64,
     },
     TooFastHorizontal {
         error_abs: f64,
-        error_rel: f64,
     },
 }
 
@@ -149,22 +146,13 @@ impl CollisionChecker {
                     }
                 } else if current_state.vx.abs() > self.max_horizontal_speed {
                     let error_abs = current_state.vx.abs() - self.max_horizontal_speed;
-                    Landing::TooFastHorizontal {
-                        error_abs,
-                        error_rel: error_abs / self.max_horizontal_speed,
-                    }
+                    Landing::TooFastHorizontal { error_abs }
                 } else if current_state.vy.abs() > self.max_vertical_speed {
                     let error_abs = current_state.vy.abs() - self.max_vertical_speed;
-                    Landing::TooFastVertical {
-                        error_abs,
-                        error_rel: error_abs / self.max_vertical_speed,
-                    }
+                    Landing::TooFastVertical { error_abs }
                 } else if current_state.angle != 0. {
                     let error_abs = current_state.angle.abs();
-                    Landing::NotVertical {
-                        error_abs,
-                        error_rel: (error_abs - self.angle_step).max(0f64) / self.angle_step,
-                    }
+                    Landing::NotVertical { error_abs }
                 } else {
                     Landing::Correct
                 };
@@ -392,7 +380,7 @@ mod collision_checker_tests {
             checker()
                 .check(&terrain(), &previous_state, &current_state)
                 .unwrap(),
-            ((x, y), Landing::NotVertical{error_abs, error_rel:_}) if x == 1500. && y == 100. && error_abs == 10.
+            ((x, y), Landing::NotVertical{error_abs}) if x == 1500. && y == 100. && error_abs == 10.
         ));
     }
 
@@ -408,7 +396,7 @@ mod collision_checker_tests {
             checker()
                 .check(&terrain(), &previous_state, &current_state)
                 .unwrap(),
-            ((x, y), Landing::NotVertical{error_abs, error_rel:_}) if x == 1500. && y == 100. && error_abs == 10.
+            ((x, y), Landing::NotVertical{error_abs}) if x == 1500. && y == 100. && error_abs == 10.
         ));
     }
 
@@ -425,7 +413,7 @@ mod collision_checker_tests {
             checker()
                 .check(&terrain(), &previous_state, &current_state)
                 .unwrap(),
-            ((x, y), Landing::TooFastVertical{error_abs, error_rel:_}) if x == 1500. && y == 100. && error_abs == 5.
+            ((x, y), Landing::TooFastVertical{error_abs}) if x == 1500. && y == 100. && error_abs == 5.
         ));
     }
 
@@ -443,7 +431,7 @@ mod collision_checker_tests {
             checker()
                 .check(&terrain(), &previous_state, &current_state)
                 .unwrap(),
-            ((x, y), Landing::TooFastHorizontal{error_abs, error_rel:_}) if x == 1500. && y == 100. && error_abs == 10.
+            ((x, y), Landing::TooFastHorizontal{error_abs}) if x == 1500. && y == 100. && error_abs == 10.
         ));
     }
 
@@ -461,7 +449,7 @@ mod collision_checker_tests {
             checker()
                 .check(&terrain(), &previous_state, &current_state)
                 .unwrap(),
-            ((x, y), Landing::TooFastHorizontal{error_abs, error_rel:_}) if x == 1500. && y == 100. && error_abs == 10.
+            ((x, y), Landing::TooFastHorizontal{error_abs}) if x == 1500. && y == 100. && error_abs == 10.
         ));
     }
 
@@ -510,7 +498,7 @@ mod collision_checker_tests {
             checker()
                 .check(&terrain(), &previous_state, &current_state)
                 .unwrap(),
-            ((x, y), Landing::TooFastHorizontal{error_abs, error_rel:_}) if x == 1500. && y == 100. && error_abs == 10.
+            ((x, y), Landing::TooFastHorizontal{error_abs}) if x == 1500. && y == 100. && error_abs == 10.
         ));
     }
 
@@ -527,7 +515,7 @@ mod collision_checker_tests {
             checker()
                 .check(&terrain(), &previous_state, &current_state)
                 .unwrap(),
-            ((x, y), Landing::TooFastVertical{error_abs, error_rel:_}) if x == 1500. && y == 100. && error_abs == 5.
+            ((x, y), Landing::TooFastVertical{error_abs}) if x == 1500. && y == 100. && error_abs == 5.
         ));
     }
 }

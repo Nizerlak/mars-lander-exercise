@@ -10,11 +10,10 @@ name="simulation"
 path="src/lib.rs"
 
 [dependencies]
-# common
 rand = "0.8"
-
-# GUI
 json = "0.12.4"
+
+[dev-dependencies]
 axum = "0.7.4"
 tokio = { version = "1.35.1", features = ["full"] }
 tower = "0.4.13"

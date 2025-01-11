@@ -91,7 +91,7 @@ async fn main() {
         .expect("Lacking simulation path argument");
     let settings_file_path = env::args().nth(2).expect("Lacking settings path argument");
 
-    let app = match App::try_new(&sim_file_path, &settings_file_path) {
+    let app = match App::try_from_files_(&sim_file_path, &settings_file_path) {
         Ok(app) => AppState {
             state: Arc::new(Mutex::new(app)),
         },
@@ -107,7 +107,7 @@ async fn main() {
             "/reset",
             put(|State(state): State<AppState>| async move {
                 let mut app = state.state.lock().unwrap();
-                *app = App::try_new(&sim_file_path.clone(), &settings_file_path.clone()).unwrap();
+                *app = App::try_from_files_(&sim_file_path.clone(), &settings_file_path.clone()).unwrap();
                 app.run().unwrap();
             }),
         )

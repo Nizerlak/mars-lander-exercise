@@ -7,7 +7,7 @@ fn main() -> Result<(), String> {
         .expect("Lacking simulation path argument");
     let settings_file_path = env::args().nth(2).expect("Lacking settings path argument");
 
-    let mut app = App::try_new(&sim_file_path, &settings_file_path)?;
+    let mut app = App::try_from_files_(&sim_file_path, &settings_file_path)?;
 
     let now = std::time::Instant::now();
     let result = app.run();

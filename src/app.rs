@@ -12,7 +12,6 @@ pub struct App {
 }
 
 impl App {
-
     pub fn try_new(
         initial_lander_state: LanderState,
         terrain: Terrain,

@@ -16,7 +16,7 @@ pub struct Terrain {
 }
 
 impl Terrain {
-    pub fn iter_segments<'a>(&'a self) -> impl Iterator<Item = (Vec2, Vec2)> + 'a {
+    pub fn iter_segments(&self) -> impl Iterator<Item = (Vec2, Vec2)> + '_ {
         MapIterator::new(
             self.max_x,
             self.max_y,
@@ -25,7 +25,7 @@ impl Terrain {
         )
     }
 
-    pub fn iter_points<'a>(&'a self) -> impl Iterator<Item = Vec2> + 'a {
+    pub fn iter_points(&self) -> impl Iterator<Item = Vec2> + '_ {
         self.x.iter().zip(&self.y).map(|(x, y)| Vec2::new(*x, *y))
     }
 
@@ -52,7 +52,7 @@ pub enum Landing {
     /// # Fields
     ///
     /// * `dist` - A floating-point value representing the distance from origin projected on terrain
-    /// segments counter-clockwise (including map boundaries).
+    ///   segments counter-clockwise (including map boundaries).
     WrongTerrain {
         dist: f64,
     },
@@ -266,7 +266,7 @@ fn check_collision(segment_a: (Vec2, Vec2), segment_b: (Vec2, Vec2)) -> Option<V
     } else if rs == 0f64 && qpr != 0f64 {
         // parallel, not intersecting
         None
-    } else if rs != 0f64 && t >= 0f64 && t <= 1f64 && u >= 0f64 && u <= 1f64 {
+    } else if rs != 0f64 && (0f64..=1f64).contains(&t) && (0f64..=1f64).contains(&u) {
         let Vec2 { x, y } = p.add(r.scale(t));
         Some(Vec2::new(x, y))
     } else {

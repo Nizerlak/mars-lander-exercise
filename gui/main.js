@@ -103,7 +103,7 @@ reset_button.onclick = async () => {
 let reset_filter_button = document.getElementById("reset_filter");
 reset_filter_button.onclick = async () => {
     routeFilter = nop;
-    setRouteState(null); 
+    setRouteState(null);
     redraw();
 };
 

@@ -42,7 +42,7 @@ impl From<&simulation::FlightState> for FlightState {
             FS::Flying => Self::Flying,
             FS::Landed(landing) => match landing {
                 L::Correct => Self::LandedCorrectly,
-                L::WrongTerrain{..} => Self::CrashedWrongTerrain,
+                L::WrongTerrain { .. } => Self::CrashedWrongTerrain,
                 L::NotVertical { .. } => Self::CrashedNotVertical,
                 L::TooFastVertical { .. } => Self::CrashedTooFastVertical,
                 L::TooFastHorizontal { .. } => Self::CrashedTooFastHorizontal,
@@ -107,7 +107,8 @@ async fn main() {
             "/reset",
             put(|State(state): State<AppState>| async move {
                 let mut app = state.state.lock().unwrap();
-                *app = App::try_from_files_(&sim_file_path.clone(), &settings_file_path.clone()).unwrap();
+                *app = App::try_from_files_(&sim_file_path.clone(), &settings_file_path.clone())
+                    .unwrap();
                 app.run().unwrap();
             }),
         )
@@ -122,8 +123,9 @@ async fn main() {
 async fn handle_terrain(State(state): State<AppState>) -> Json<Value> {
     let app = state.state.lock().unwrap();
     let terrain = app.get_terrain();
-    let v = terrain.iter_points()
-        .map(|simulation::Vec2{x, y}| vec![x, y])
+    let v = terrain
+        .iter_points()
+        .map(|simulation::Vec2 { x, y }| vec![x, y])
         .collect::<Vec<_>>();
     Json(serde_json::to_value(v).unwrap())
 }

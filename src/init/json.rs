@@ -80,14 +80,13 @@ fn parse_terrain(terrain_array: &JsonValue) -> Result<Terrain, String> {
 }
 
 fn parse_lander(json: &JsonValue) -> Result<LanderState, String> {
-    let mut initial_lander_state = LanderState::default();
-
-    initial_lander_state.x = get_json!(json, "Lander", "X", as_f64);
-    initial_lander_state.y = get_json!(json, "Lander", "Y", as_f64);
-    initial_lander_state.vx = get_json!(json, "Lander", "HSpeed", as_f64);
-    initial_lander_state.vy = get_json!(json, "Lander", "VSpeed", as_f64);
-    initial_lander_state.fuel = get_json!(json, "Lander", "Fuel", as_i32);
-    initial_lander_state.angle = get_json!(json, "Lander", "Angle", as_f64);
-    initial_lander_state.power = get_json!(json, "Lander", "Power", as_i32);
-    Ok(initial_lander_state)
+    Ok(LanderState {
+        x: get_json!(json, "Lander", "X", as_f64),
+        y: get_json!(json, "Lander", "Y", as_f64),
+        vx: get_json!(json, "Lander", "HSpeed", as_f64),
+        vy: get_json!(json, "Lander", "VSpeed", as_f64),
+        fuel: get_json!(json, "Lander", "Fuel", as_i32),
+        angle: get_json!(json, "Lander", "Angle", as_f64),
+        power: get_json!(json, "Lander", "Power", as_i32),
+    })
 }

@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 pub use crate::simulation::*;
 
 #[derive(Debug)]
@@ -7,9 +9,9 @@ pub enum Error {
     SimulationError(SimulationError),
 }
 
-impl ToString for Error {
-    fn to_string(&self) -> String {
-        format!("{:?}", self)
+impl Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self)
     }
 }
 
@@ -26,9 +28,9 @@ pub enum FlightState {
     Landed(Landing),
 }
 
-impl Into<Error> for SimulationError {
-    fn into(self) -> Error {
-        Error::SimulationError(self)
+impl From<SimulationError> for Error {
+    fn from(val: SimulationError) -> Self {
+        Error::SimulationError(val)
     }
 }
 
@@ -114,10 +116,10 @@ impl LanderRunner {
                 let mut new_lander_state = self
                     .physics
                     .iterate(lander.clone(), cmd)
-                    .map_err(|e| e.into())?;
+                    .map_err(<SimulationError as std::convert::Into<Error>>::into)?;
                 if let Some(((x, y), landing)) =
                     self.collision_checker
-                        .check(terrain, &lander, &new_lander_state)
+                        .check(terrain, lander, &new_lander_state)
                 {
                     *flight_state = FlightState::Landed(landing);
                     new_lander_state.x = x;

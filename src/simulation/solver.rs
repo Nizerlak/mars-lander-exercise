@@ -74,14 +74,14 @@ fn clamp(v: i32, range: RangeInclusive<i32>) -> i32 {
 }
 
 fn crossed(
-    a: &Vec<i32>,
-    b: &Vec<i32>,
+    a: &[i32],
+    b: &[i32],
     i: f64,
     clamp: impl Fn(i32) -> i32,
 ) -> Result<(Vec<i32>, Vec<i32>), String> {
     if a.len() != b.len() {
         return Err(format!("a.len() != b.len() ({} != {})", a.len(), b.len()));
-    } else if i > 1f64 || i < 0f64 {
+    } else if !(0f64..=1f64).contains(&i) {
         return Err(format!("i out of range [0,1], i={i}"));
     }
 
@@ -245,7 +245,7 @@ impl Solver {
                 let parent1 = r.next().ok_or("Can't get parent1")?;
                 let parent2 = r.next().ok_or("Can't get parent2")?;
                 let (mut c1, mut c2) =
-                    parent1.crossover(&parent2, rand::thread_rng().gen_range(0f64..1f64))?;
+                    parent1.crossover(parent2, rand::thread_rng().gen_range(0f64..1f64))?;
                 c1.mutate(self.mutation_prob);
                 c2.mutate(self.mutation_prob);
                 new_population.push(c1);
@@ -258,7 +258,7 @@ impl Solver {
     fn accumulated_population(
         initial_angle: i32,
         initial_thrust: i32,
-        population: &Vec<Chromosome>,
+        population: &[Chromosome],
     ) -> Vec<Chromosome> {
         population.iter().fold(
             Vec::new(),
@@ -295,7 +295,7 @@ impl FitnessCalculator {
         }
     }
 
-    pub fn calculate_fitness(&self, landing_results: &Vec<super::Landing>) -> Option<Vec<f64>> {
+    pub fn calculate_fitness(&self, landing_results: &[super::Landing]) -> Option<Vec<f64>> {
         use crate::Landing;
         let some_or_max = |a: Option<f64>, er: f64| Some(a.map_or(er, |v| v.max(er)));
         let landed_normalized = |error: f64, max: Option<f64>| {
@@ -411,21 +411,21 @@ mod accumulation_test {
 
     #[test]
     fn accumulate1() {
-        let a = vec![1, 1, 1, 1];
+        let a = [1, 1, 1, 1];
         let a: Vec<_> = accumulated(0, a.iter().copied(), pass).collect();
         assert_eq!(a, vec![1, 2, 3, 4]);
     }
 
     #[test]
     fn accumulate2() {
-        let a = vec![1, 1, 1, 1];
+        let a = [1, 1, 1, 1];
         let a: Vec<_> = accumulated(3, a.iter().copied(), pass).collect();
         assert_eq!(a, vec![4, 5, 6, 7]);
     }
 
     #[test]
     fn accumulate_clamped() {
-        let a = vec![1, 1, 1, 1];
+        let a = [1, 1, 1, 1];
         let a: Vec<_> = accumulated(3, a.iter().copied(), |x| x.min(6)).collect();
         assert_eq!(a, vec![4, 5, 6, 6]);
     }

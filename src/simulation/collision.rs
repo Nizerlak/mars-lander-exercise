@@ -271,7 +271,12 @@ mod collision_checker_tests {
     use super::*;
 
     fn terrain() -> Terrain {
-        Terrain::new(7000., 3000., vec![0., 3500., 7000.], vec![100., 100., 150.])
+        Terrain::new(
+            7000.,
+            3000.,
+            vec![0., 2000., 4000., 7000.],
+            vec![200., 100., 100., 150.],
+        )
     }
 
     fn checker() -> CollisionChecker {
@@ -372,7 +377,7 @@ mod collision_checker_tests {
     fn not_vertical1() {
         let previous_state = LanderState::default().with_x(1000.).with_y(500.);
         let current_state = LanderState::default()
-            .with_x(1500.)
+            .with_x(3500.)
             .with_y(100.)
             .with_angle(10.);
 
@@ -380,7 +385,7 @@ mod collision_checker_tests {
             checker()
                 .check(&terrain(), &previous_state, &current_state)
                 .unwrap(),
-            ((x, y), Landing::NotVertical{error_abs}) if x == 1500. && y == 100. && error_abs == 10.
+            ((x, y), Landing::NotVertical{error_abs}) if x == 3500. && y == 100. && error_abs == 10.
         ));
     }
 
@@ -388,7 +393,7 @@ mod collision_checker_tests {
     fn not_vertical2() {
         let previous_state = LanderState::default().with_x(1000.).with_y(500.);
         let current_state = LanderState::default()
-            .with_x(1500.)
+            .with_x(3500.)
             .with_y(100.)
             .with_angle(-10.);
 
@@ -396,7 +401,7 @@ mod collision_checker_tests {
             checker()
                 .check(&terrain(), &previous_state, &current_state)
                 .unwrap(),
-            ((x, y), Landing::NotVertical{error_abs}) if x == 1500. && y == 100. && error_abs == 10.
+            ((x, y), Landing::NotVertical{error_abs}) if x == 3500. && y == 100. && error_abs == 10.
         ));
     }
 
@@ -404,7 +409,7 @@ mod collision_checker_tests {
     fn too_fast_vertical() {
         let previous_state = LanderState::default().with_x(1000.).with_y(500.);
         let current_state = LanderState::default()
-            .with_x(1500.)
+            .with_x(3500.)
             .with_y(100.)
             .with_angle(0.)
             .with_vy(-45.);
@@ -413,7 +418,7 @@ mod collision_checker_tests {
             checker()
                 .check(&terrain(), &previous_state, &current_state)
                 .unwrap(),
-            ((x, y), Landing::TooFastVertical{error_abs}) if x == 1500. && y == 100. && error_abs == 5.
+            ((x, y), Landing::TooFastVertical{error_abs}) if x == 3500. && y == 100. && error_abs == 5.
         ));
     }
 
@@ -421,7 +426,7 @@ mod collision_checker_tests {
     fn too_fast_horizontal1() {
         let previous_state = LanderState::default().with_x(1000.).with_y(500.);
         let current_state = LanderState::default()
-            .with_x(1500.)
+            .with_x(3500.)
             .with_y(100.)
             .with_angle(0.)
             .with_vy(-10.)
@@ -431,7 +436,7 @@ mod collision_checker_tests {
             checker()
                 .check(&terrain(), &previous_state, &current_state)
                 .unwrap(),
-            ((x, y), Landing::TooFastHorizontal{error_abs}) if x == 1500. && y == 100. && error_abs == 10.
+            ((x, y), Landing::TooFastHorizontal{error_abs}) if x == 3500. && y == 100. && error_abs == 10.
         ));
     }
 
@@ -439,7 +444,7 @@ mod collision_checker_tests {
     fn too_fast_horizontal2() {
         let previous_state = LanderState::default().with_x(1000.).with_y(500.);
         let current_state = LanderState::default()
-            .with_x(1500.)
+            .with_x(3500.)
             .with_y(100.)
             .with_angle(0.)
             .with_vy(-10.)
@@ -449,7 +454,7 @@ mod collision_checker_tests {
             checker()
                 .check(&terrain(), &previous_state, &current_state)
                 .unwrap(),
-            ((x, y), Landing::TooFastHorizontal{error_abs}) if x == 1500. && y == 100. && error_abs == 10.
+            ((x, y), Landing::TooFastHorizontal{error_abs}) if x == 3500. && y == 100. && error_abs == 10.
         ));
     }
 
@@ -457,7 +462,7 @@ mod collision_checker_tests {
     fn correct() {
         let previous_state = LanderState::default().with_x(1000.).with_y(500.);
         let current_state = LanderState::default()
-            .with_x(1500.)
+            .with_x(3500.)
             .with_y(100.)
             .with_angle(0.)
             .with_vy(-10.)
@@ -467,7 +472,7 @@ mod collision_checker_tests {
             checker()
                 .check(&terrain(), &previous_state, &current_state)
                 .unwrap(),
-            ((x, y), Landing::Correct) if x == 1500. && y == 100.
+            ((x, y), Landing::Correct) if x == 3500. && y == 100.
         ));
     }
 
@@ -488,7 +493,7 @@ mod collision_checker_tests {
     fn too_fast_horizontal_before_too_fast_vertical() {
         let previous_state = LanderState::default().with_x(1000.).with_y(500.);
         let current_state = LanderState::default()
-            .with_x(1500.)
+            .with_x(3500.)
             .with_y(100.)
             .with_angle(30.)
             .with_vy(-10.)
@@ -498,7 +503,7 @@ mod collision_checker_tests {
             checker()
                 .check(&terrain(), &previous_state, &current_state)
                 .unwrap(),
-            ((x, y), Landing::TooFastHorizontal{error_abs}) if x == 1500. && y == 100. && error_abs == 10.
+            ((x, y), Landing::TooFastHorizontal{error_abs}) if x == 3500. && y == 100. && error_abs == 10.
         ));
     }
 
@@ -506,7 +511,7 @@ mod collision_checker_tests {
     fn too_fast_vertical_before_not_vertical() {
         let previous_state = LanderState::default().with_x(1000.).with_y(500.);
         let current_state = LanderState::default()
-            .with_x(1500.)
+            .with_x(3500.)
             .with_y(100.)
             .with_angle(40.)
             .with_vy(-45.);
@@ -515,7 +520,7 @@ mod collision_checker_tests {
             checker()
                 .check(&terrain(), &previous_state, &current_state)
                 .unwrap(),
-            ((x, y), Landing::TooFastVertical{error_abs}) if x == 1500. && y == 100. && error_abs == 5.
+            ((x, y), Landing::TooFastVertical{error_abs}) if x == 3500. && y == 100. && error_abs == 5.
         ));
     }
 }

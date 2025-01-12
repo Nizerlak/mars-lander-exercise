@@ -48,7 +48,6 @@ impl LanderStateCalculation {
 
     pub fn calculate_new_lander_state(
         &self,
-        terrain: &Terrain,
         lander: &LanderState,
         cmd: Command,
     ) -> Result<(LanderState, FlightState), Error> {
@@ -56,10 +55,7 @@ impl LanderStateCalculation {
             .physics
             .iterate(lander.clone(), cmd)
             .map_err(<SimulationError as std::convert::Into<Error>>::into)?;
-        if let Some(((x, y), landing)) =
-            self.collision_checker
-                .check(terrain, lander, &new_lander_state)
-        {
+        if let Some(((x, y), landing)) = self.collision_checker.check(lander, &new_lander_state) {
             Ok((
                 LanderState {
                     x,
@@ -117,11 +113,7 @@ impl LanderRunner {
         self.states.iter()
     }
 
-    pub fn iterate(
-        &mut self,
-        population: &mut [Chromosome],
-        terrain: &Terrain,
-    ) -> Result<ExecutionStatus, Error> {
+    pub fn iterate(&mut self, population: &mut [Chromosome]) -> Result<ExecutionStatus, Error> {
         assert_eq!(self.states.len(), self.landers.len());
         assert_eq!(self.states.len(), population.len());
 
@@ -144,25 +136,22 @@ impl LanderRunner {
                     id,
                     sub_id: self.iteration_id,
                 })?;
-                let (new_lander_state, new_flight_state) =
-                    match self.lander_state_calculator.calculate_new_lander_state(
-                        terrain,
-                        lander,
-                        Command::new(*angle as f64, *thrust),
-                    )? {
-                        (_, FlightState::Landed(Landing::NotVertical { error_abs, .. }))
-                            if error_abs <= self.angle_step =>
-                        {
-                            *angle = 0;
-                            println!("Corrected angle for chromosome with id {id}");
-                            self.lander_state_calculator.calculate_new_lander_state(
-                                terrain,
-                                lander,
-                                Command::new(*angle as f64, *thrust),
-                            )? // recalculate for new angle
-                        }
-                        other => other,
-                    };
+                let (new_lander_state, new_flight_state) = match self
+                    .lander_state_calculator
+                    .calculate_new_lander_state(lander, Command::new(*angle as f64, *thrust))?
+                {
+                    (_, FlightState::Landed(Landing::NotVertical { error_abs, .. }))
+                        if error_abs <= self.angle_step =>
+                    {
+                        *angle = 0;
+                        println!("Corrected angle for chromosome with id {id}");
+                        self.lander_state_calculator.calculate_new_lander_state(
+                            lander,
+                            Command::new(*angle as f64, *thrust),
+                        )? // recalculate for new angle
+                    }
+                    other => other,
+                };
                 *lander = new_lander_state;
                 *flight_state = new_flight_state;
             }

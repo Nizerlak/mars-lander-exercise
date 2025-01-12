@@ -29,7 +29,8 @@ impl App {
             initial_lander_state.clone(),
             settings.population_size,
             Physics::default(),
-            CollisionChecker::default(),
+            CollisionChecker::try_with_default_limits(terrain.clone())
+                .ok_or("Failed to create collision checker")?,
         );
         let flight_histories: Vec<_> =
             vec![
@@ -78,7 +79,7 @@ impl App {
         let mut population: Vec<_> = self.solver.iter_accumulated_population().collect();
         while let ExecutionStatus::InProgress = self
             .lander_runner
-            .iterate(&mut population, &self.terrain)
+            .iterate(&mut population)
             .map_err(|e| e.to_string())?
         {
             self.save_last_lander_states_in_flight();

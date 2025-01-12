@@ -262,32 +262,34 @@ fn landing_state_score(state: &crate::Landing) -> f64 {
 
 #[derive(Default)]
 struct MaxErrors {
-    angle_error: Option<f64>,
-    horizontal_speed_error: Option<f64>,
-    vertical_speed_error: Option<f64>,
-    terrain_dist_error: Option<f64>,
+    angle_error: Option<(f64, f64)>,
+    horizontal_speed_error: Option<(f64, f64)>,
+    vertical_speed_error: Option<(f64, f64)>,
+    terrain_dist_error: Option<(f64, f64)>,
 }
 
-fn update_max(a: &mut Option<f64>, b: f64) {
+fn update_min_max(a: &mut Option<(f64, f64)>, b: f64) {
     *a = match a {
-        None => Some(b),
-        Some(existing) => Some(existing.max(b)),
+        None => Some((b, b)),
+        Some((existing_min, existing_max)) => Some((existing_min.min(b), existing_max.max(b))),
     };
 }
 
-fn get_max_errors<'a>(landing_results: impl Iterator<Item = &'a super::Landing>) -> MaxErrors {
+fn get_min_max_errors<'a>(landing_results: impl Iterator<Item = &'a super::Landing>) -> MaxErrors {
     landing_results.fold(MaxErrors::default(), |mut errors, landing_result| {
         use super::Landing;
         match landing_result {
             Landing::NotVertical { error_abs, .. } => {
-                update_max(&mut errors.angle_error, *error_abs)
+                update_min_max(&mut errors.angle_error, *error_abs)
             }
-            Landing::WrongTerrain { dist, .. } => update_max(&mut errors.terrain_dist_error, *dist),
+            Landing::WrongTerrain { dist, .. } => {
+                update_min_max(&mut errors.terrain_dist_error, *dist)
+            }
             Landing::TooFastHorizontal { error_abs, .. } => {
-                update_max(&mut errors.horizontal_speed_error, *error_abs)
+                update_min_max(&mut errors.horizontal_speed_error, *error_abs)
             }
             Landing::TooFastVertical { error_abs, .. } => {
-                update_max(&mut errors.vertical_speed_error, *error_abs)
+                update_min_max(&mut errors.vertical_speed_error, *error_abs)
             }
             Landing::Correct => (),
         };
@@ -297,18 +299,30 @@ fn get_max_errors<'a>(landing_results: impl Iterator<Item = &'a super::Landing>)
 
 pub fn calculate_fitness(landing_results: &[super::Landing]) -> Option<Vec<f64>> {
     use crate::Landing;
-    let max_errors = get_max_errors(landing_results.iter());
+    let max_errors = get_min_max_errors(landing_results.iter());
+    let normalized_score = |value, (min, max)| {
+        assert!(max >= min);
+        if max == min {
+            0.
+        } else {
+            (value - min) / (max - min)
+        }
+    };
     let base_score = |result: &Landing| {
         Some(match result {
             Landing::Correct => 0.,
-            Landing::NotVertical { error_abs, .. } => error_abs / max_errors.angle_error?,
+            Landing::NotVertical { error_abs, .. } => {
+                normalized_score(*error_abs, max_errors.angle_error?)
+            }
             Landing::TooFastHorizontal { error_abs, .. } => {
-                error_abs / max_errors.horizontal_speed_error?
+                normalized_score(*error_abs, max_errors.horizontal_speed_error?)
             }
             Landing::TooFastVertical { error_abs, .. } => {
-                error_abs / max_errors.vertical_speed_error?
+                normalized_score(*error_abs, max_errors.vertical_speed_error?)
             }
-            Landing::WrongTerrain { dist } => dist / max_errors.terrain_dist_error?,
+            Landing::WrongTerrain { dist } => {
+                normalized_score(*dist, max_errors.terrain_dist_error?)
+            }
         })
     };
 

@@ -1,4 +1,6 @@
 # mars-lander-exercise
+![rust workflow](https://github.com/Nizerlak/mars-lander-exercise/actions/workflows/rust.yml/badge.svg?event=push)
+
 Visual playground and solution to CodinGame's exercise: [Mars Lander: episode 3](https://www.codingame.com/training/expert/mars-lander-episode-3)
 ![mars-lander-solving](https://github.com/user-attachments/assets/aaa13b80-038f-45e3-ac47-be554f66b46d)
 

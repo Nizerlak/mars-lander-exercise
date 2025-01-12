@@ -73,12 +73,24 @@ const currentTerrain = await(await fetchData("terrain")).json();
 redraw();
 const nop = () => { return true; };
 let routeFilter = nop;
+let run_switch = null;
+function try_clear_run() {
+    if (run_switch) {
+        clearInterval(run_switch);
+    }
+}
 
-let nextButton = document.getElementById("next_button");
-nextButton.onclick = async () => {
-    await fetchData('next', {
+async function handleNext() {
+    await(await fetchData('next', {
         method: 'PUT',
-    }).then((data) => console.log('Next generation: ', data.response)).catch((error) => console.log(error));
+    })).text().then(async (data) => {
+        if (data === "true") {
+            console.log('Got solution');
+            try_clear_run();
+        } else if (data !== "false") {
+            throw new Error('Unexpected response for next:', data);
+        }
+    }).catch((error) => console.log(error));
     await fetchDataAndHandleResponse('population', (data) => {
         currentPopulation = data;
         console.log("Population");
@@ -86,11 +98,18 @@ nextButton.onclick = async () => {
     });
     redraw();
     drawFitnessTable(currentPopulation);
+}
+
+let nextButton = document.getElementById("next_button");
+nextButton.onclick = async () => {
+    try_clear_run();
+    await handleNext();
 };
 
 
 let reset_button = document.getElementById("reset_button");
 reset_button.onclick = async () => {
+    try_clear_run();
     await fetchData('reset', {
         method: 'PUT',
     });
@@ -103,10 +122,19 @@ reset_button.onclick = async () => {
 
 let reset_filter_button = document.getElementById("reset_filter");
 reset_filter_button.onclick = async () => {
+    try_clear_run();
     routeFilter = nop;
     setRouteState(null);
     redraw();
 };
+
+
+let run_until_solution_button = document.getElementById("until_solution_found");
+const RUN_UNTIL_INTERVAL_MS = 300;
+run_until_solution_button.onclick = async () => {
+    try_clear_run();
+    run_switch = setInterval(handleNext, RUN_UNTIL_INTERVAL_MS);
+}
 
 function printStats(population) {
     const routes_sizes = Array.from(population['routes'], (r) => r['positions'].length);

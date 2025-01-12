@@ -18,7 +18,7 @@ impl Display for Error {
 #[derive(Debug)]
 pub enum ExecutionStatus {
     InProgress,
-    Finished,
+    Finished(Option<usize>),
 }
 
 #[derive(Debug, Clone)]
@@ -76,6 +76,7 @@ pub struct LanderRunner {
     lander_state_calculator: LanderStateCalculation,
     angle_step: f64,
     iteration_id: usize,
+    correct_landing_id: Option<usize>,
 }
 
 impl LanderRunner {
@@ -92,6 +93,7 @@ impl LanderRunner {
             landers: vec![initial_lander_state; num_of_landers],
             angle_step,
             iteration_id: 0,
+            correct_landing_id: None,
         }
     }
 
@@ -153,6 +155,9 @@ impl LanderRunner {
                 };
                 *lander = new_lander_state;
                 *flight_state = new_flight_state;
+                if let FlightState::Landed(Landing::Correct) = flight_state {
+                    self.correct_landing_id = Some(id);
+                }
             }
         }
 
@@ -160,7 +165,7 @@ impl LanderRunner {
             self.iteration_id += 1;
             Ok(ExecutionStatus::InProgress)
         } else {
-            Ok(ExecutionStatus::Finished)
+            Ok(ExecutionStatus::Finished(self.correct_landing_id))
         }
     }
 }

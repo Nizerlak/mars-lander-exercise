@@ -19,30 +19,20 @@ struct Cli {
     iterations_max: usize,
 }
 
-fn find_solved(app: &App) -> Option<Chromosome> {
-    app.get_current_states()
-        .zip(app.get_population_accumulated())
-        .find_map(|(state, chromosome)| {
-            if let FlightState::Landed(Landing::Correct) = state {
-                Some(chromosome)
-            } else {
-                None
-            }
-        })
-}
-
 fn main() -> Result<(), String> {
     let cli = Cli::parse();
 
     let mut app = App::try_from_files(cli.sim, cli.settings)?;
 
     for i in 0..cli.iterations_max {
-        app.run()?;
-        if let Some(_) = find_solved(&app) {
+        if let Some(_) = app.run()? {
             println!("Found solution in {i} generation");
             return Ok(());
         }
         app.next_population()?;
     }
-    Err("Maximal iterations count reached".to_owned())
+    Err(format!(
+        "Maximal iterations count reached ({})",
+        cli.iterations_max
+    ))
 }

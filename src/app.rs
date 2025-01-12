@@ -70,22 +70,26 @@ impl App {
         Ok(())
     }
 
-    pub fn run(&mut self) -> Result<(), String> {
+    pub fn run(&mut self) -> Result<Option<Chromosome>, String> {
         self.lander_runner
             .reinitialize(self.initial_lander_state.clone());
         self.flight_histories.iter_mut().for_each(|h| {
             *h = LanderHistory::with_initial_state(self.initial_lander_state.clone())
         });
         let mut population: Vec<_> = self.solver.iter_accumulated_population().collect();
-        while let ExecutionStatus::InProgress = self
-            .lander_runner
-            .iterate(&mut population)
-            .map_err(|e| e.to_string())?
-        {
-            self.save_last_lander_states_in_flight();
-        }
+        let res = loop {
+            if let ExecutionStatus::Finished(maybe_id) = self
+                .lander_runner
+                .iterate(&mut population)
+                .map_err(|e| e.to_string())?
+            {
+                break maybe_id
+                    .map(|correct_landing_id| population.get(correct_landing_id).unwrap());
+            }
+            self.save_last_lander_states_in_flight()
+        };
         self.save_last_lander_states();
-        Ok(())
+        Ok(res.cloned())
     }
 
     pub fn get_routes(&self) -> impl Iterator<Item = impl Iterator<Item = LanderState> + '_> + '_ {

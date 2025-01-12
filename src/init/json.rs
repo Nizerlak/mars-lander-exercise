@@ -1,6 +1,6 @@
 use crate::simulation::*;
 use json::{self, JsonValue};
-use std::{fs::File, io::Read};
+use std::{fs::File, io::Read, path::Path};
 
 macro_rules! get_json {
     ($json:ident,$($key:literal),+, $func:ident) => {
@@ -27,7 +27,7 @@ macro_rules! json_value_or_err {
     };
 }
 
-pub fn parse_settings(settings_file_path: &String) -> Result<Settings, String> {
+pub fn parse_settings<P: AsRef<Path>>(settings_file_path: P) -> Result<Settings, String> {
     let settings_json = read_json(settings_file_path)?;
 
     let settings = Settings {
@@ -39,7 +39,7 @@ pub fn parse_settings(settings_file_path: &String) -> Result<Settings, String> {
     Ok(settings)
 }
 
-pub fn parse_sim(sim_file_path: &String) -> Result<(LanderState, Terrain), String> {
+pub fn parse_sim<P: AsRef<Path>>(sim_file_path: P) -> Result<(LanderState, Terrain), String> {
     let sim_json = read_json(sim_file_path)?;
 
     Ok((
@@ -48,10 +48,10 @@ pub fn parse_sim(sim_file_path: &String) -> Result<(LanderState, Terrain), Strin
     ))
 }
 
-fn read_json(file_path: &String) -> Result<JsonValue, String> {
+fn read_json<P: AsRef<Path>>(file_path: P) -> Result<JsonValue, String> {
     let mut file_content = String::new();
-    let mut file =
-        File::open(file_path).map_err(|e| format!("Error while opening file {file_path}: {e}"))?;
+    let mut file = File::open(&file_path)
+        .map_err(|e| format!("Error while opening file {:?}: {e}", file_path.as_ref()))?;
 
     file.read_to_string(&mut file_content)
         .map_err(|e| format!("Failed to read file: {e}"))?;

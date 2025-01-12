@@ -152,7 +152,8 @@ async function fetchDataAndHandleResponse(dataType, handleResponse, options = {}
 
 function drawPopulation(population) {
     for (const route of population.routes.filter(routeFilter)) {
-        drawLine(route['positions'], 'green');
+        const color = route.flight_state == "LandedCorrectly" ? "red" : "green";
+        drawLine(route['positions'], color);
     }
     ctx.fillStyle = "white";
     ctx.font = "30px serif";

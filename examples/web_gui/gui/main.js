@@ -31,6 +31,7 @@ const gridOptions = {
     columnDefs: [
         { field: "Id" },
         { field: "Fitness" },
+        { field: "Result" }
     ]
 };
 
@@ -182,5 +183,6 @@ function drawLine(line, style = 'white') {
 }
 
 function drawFitnessTable(population) {
-    fitnessGridApi.setGridOption('rowData', population.fitness.map((v, i) => { return { Id: i, Fitness: v }; }));
+    const fitnesses = population.fitness.map((v, i) => { return { Id: i, Fitness: v, Result: JSON.stringify(population.routes[i].flight_state) }; })
+    fitnessGridApi.setGridOption('rowData', fitnesses);
 }

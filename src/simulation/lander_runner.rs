@@ -144,7 +144,6 @@ impl LanderRunner {
                         if error_abs <= self.angle_step =>
                     {
                         *angle = 0;
-                        println!("Corrected angle for chromosome with id {id}");
                         self.lander_state_calculator.calculate_new_lander_state(
                             lander,
                             Command::new(*angle as f64, *thrust),

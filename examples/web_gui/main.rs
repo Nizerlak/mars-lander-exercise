@@ -130,19 +130,22 @@ async fn handle_terrain(State(state): State<AppState>) -> Json<Value> {
     Json(serde_json::to_value(v).unwrap())
 }
 
-async fn handle_next(State(state): State<AppState>) -> Result<(), (StatusCode, String)> {
+async fn handle_next(State(state): State<AppState>) -> Result<String, (StatusCode, String)> {
     let mut app = state.state.lock().unwrap();
-    app.run().map_err(|e: String| {
-        let e = format!("App run failed: {e}");
-        eprintln!("{e}");
-        (StatusCode::INTERNAL_SERVER_ERROR, e)
-    })?;
+    let found_solution = app
+        .run()
+        .map_err(|e: String| {
+            let e = format!("App run failed: {e}");
+            eprintln!("{e}");
+            (StatusCode::INTERNAL_SERVER_ERROR, e)
+        })?
+        .is_some();
     app.next_population().map_err(|e: String| {
         let e = format!("App next population failed: {e}");
         eprintln!("{e}");
         (StatusCode::INTERNAL_SERVER_ERROR, e)
     })?;
-    Ok(())
+    Ok(found_solution.to_string())
 }
 
 async fn handle_population(State(AppState { state }): State<AppState>) -> Json<Value> {

@@ -307,8 +307,8 @@ mod collision_checker_tests {
         Terrain::new(
             7000.,
             3000.,
-            vec![0., 2000., 4000., 7000.],
-            vec![200., 100., 100., 150.],
+            vec![0., 300., 6700., 7000.],
+            vec![500., 100., 100., 500.],
         )
     }
 
@@ -336,7 +336,7 @@ mod collision_checker_tests {
             checker()
                 .check(&previous_state, &current_state)
                 .unwrap(),
-            ((x, y), Landing::WrongTerrain{dist}) if x ==0. && y == 700. && dist == 2300.
+            ((x, y), Landing::WrongTerrain{dist}) if x ==0. && y == 700. && dist == 700.
         ));
     }
 
@@ -388,18 +388,18 @@ mod collision_checker_tests {
             checker()
                 .check(&previous_state, &current_state)
                 .unwrap(),
-            ((x, y), Landing::WrongTerrain{dist}) if x == 0. && y == 3000. && dist == 0.
+            ((x, y), Landing::WrongTerrain{dist}) if x == 0. && y == 3000. && dist == 3000.
         ));
     }
 
     #[test]
     fn wrong_terrain() {
-        let previous_state = LanderState::default().with_x(1000.).with_y(500.);
-        let current_state = LanderState::default().with_x(5000.).with_y(100.);
+        let previous_state = LanderState::default().with_x(6850.).with_y(301.);
+        let current_state = LanderState::default().with_x(6850.).with_y(299.);
 
         assert!(matches!(
             checker().check(&previous_state, &current_state).unwrap(),
-            (_, Landing::WrongTerrain { .. })
+            (_, Landing::WrongTerrain { dist }) if dist == 250.
         ));
     }
 
@@ -508,8 +508,8 @@ mod collision_checker_tests {
 
     #[test]
     fn wrong_terrain_before_too_fast_horizotal() {
-        let previous_state = LanderState::default().with_x(1000.).with_y(500.);
-        let current_state = LanderState::default().with_x(5000.).with_y(100.);
+        let previous_state = LanderState::default().with_x(6900.).with_y(500.);
+        let current_state = LanderState::default().with_x(6900.).with_y(50.);
 
         assert!(matches!(
             checker().check(&previous_state, &current_state).unwrap(),

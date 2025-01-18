@@ -1,0 +1,31 @@
+# Do not run this workflow on pull request since this workflow has permission to modify contents.
+on:
+    push:
+      branches:
+        - master
+
+permissions:
+    # deployments permission to deploy GitHub pages website
+    deployments: write
+    # contents permission to update benchmark contents in gh-pages branch
+    contents: write
+
+jobs:
+    benchmark:
+        runs-on: ubuntu-latest
+
+        steps:
+        - uses: actions/checkout@v3
+
+        - name: Run benchmark
+          run: cargo bench -- --output-format bencher | tee output.txt
+        - name: Store benchmark result
+          uses: benchmark-action/github-action-benchmark@v1
+          with:
+            name: App signle iteration benchmark
+            tool: 'cargo'
+            output-file-path: output.txt
+            # Access token to deploy GitHub Pages branch
+            github-token: ${{ secrets.GITHUB_TOKEN }}
+            # Push and deploy GitHub pages branch automatically
+            auto-push: true

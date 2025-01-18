@@ -1,8 +1,8 @@
-# Do not run this workflow on pull request since this workflow has permission to modify contents.
+name: Benchmarks
+
 on:
-    push:
-      branches:
-        - master
+  push:
+    branches: [ "main" ]
 
 permissions:
     # deployments permission to deploy GitHub pages website

@@ -16,11 +16,6 @@ jobs:
 
         steps:
         - uses: actions/checkout@v3
-        - name: Download previous benchmark data
-          uses: actions/cache@v4
-          with:
-            path: ./cache
-            key: ${{ runner.os }}-benchmark
 
         - name: Run benchmark
           run: cargo bench -- --output-format bencher | tee output.txt
@@ -30,7 +25,6 @@ jobs:
             name: App signle iteration benchmark
             tool: 'cargo'
             output-file-path: output.txt
-            external-data-json-path: ./cache/benchmark-data.json
             # Access token to deploy GitHub Pages branch
             github-token: ${{ secrets.GITHUB_TOKEN }}
             # Push and deploy GitHub pages branch automatically

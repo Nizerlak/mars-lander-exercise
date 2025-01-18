@@ -48,6 +48,14 @@ pub fn parse_sim<P: AsRef<Path>>(sim_file_path: P) -> Result<(LanderState, Terra
     ))
 }
 
+pub fn parse_from_string(json: &str) -> Result<(LanderState, Terrain), String> {
+    let sim_json = json::parse(json).map_err(|e| format!("Json error: {e}"))?;
+    Ok((
+        parse_lander(&sim_json)?,
+        parse_terrain(json_value_or_err!(sim_json, "Terrain")?)?,
+    ))
+}
+
 fn read_json<P: AsRef<Path>>(file_path: P) -> Result<JsonValue, String> {
     let mut file_content = String::new();
     let mut file = File::open(&file_path)

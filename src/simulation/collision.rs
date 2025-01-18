@@ -296,7 +296,7 @@ fn check_collision(segment_a: (Vec2, Vec2), segment_b: (Vec2, Vec2)) -> Option<V
 }
 
 pub fn distance(a: Vec2, b: Vec2) -> f64 {
-    (a.x - b.x).hypot(a.y - b.y)
+    f64::sqrt((a.x - b.x).powi(2) + (a.y - b.y).powi(2))
 }
 
 #[cfg(test)]

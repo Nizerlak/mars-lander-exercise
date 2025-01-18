@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1737206516454,
+  "lastUpdate": 1737208008905,
   "repoUrl": "https://github.com/Nizerlak/mars-lander-exercise",
   "entries": {
     "App signle iteration benchmark": [
@@ -143,6 +143,78 @@ window.BENCHMARK_DATA = {
             "name": "run_next_population_complicated_sim_hard_settings",
             "value": 8572509,
             "range": "± 191128",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "prdabr@gmail.com",
+            "name": "nizerlak",
+            "username": "Nizerlak"
+          },
+          "committer": {
+            "email": "prdabr@gmail.com",
+            "name": "nizerlak",
+            "username": "Nizerlak"
+          },
+          "distinct": true,
+          "id": "832684b5abb8617f49906f450d60a86b57f121ec",
+          "message": "Refactor distance calculation",
+          "timestamp": "2025-01-18T14:37:57+01:00",
+          "tree_id": "6efff1ae8e836592b48d95aa7fdddd5c20babcc4",
+          "url": "https://github.com/Nizerlak/mars-lander-exercise/commit/832684b5abb8617f49906f450d60a86b57f121ec"
+        },
+        "date": 1737208008420,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "run_simple_sim_light_settings",
+            "value": 266432,
+            "range": "± 3435",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "run_complicated_sim_light_settings",
+            "value": 248342,
+            "range": "± 1507",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "run_simple_sim_hard_settings",
+            "value": 1715108,
+            "range": "± 18125",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "run_complicated_sim_hard_settings",
+            "value": 1912362,
+            "range": "± 21315",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "run_next_population_simple_sim_light_settings",
+            "value": 499398,
+            "range": "± 26531",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "run_next_population_complicated_sim_light_settings",
+            "value": 611480,
+            "range": "± 24353",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "run_next_population_simple_sim_hard_settings",
+            "value": 4011682,
+            "range": "± 90166",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "run_next_population_complicated_sim_hard_settings",
+            "value": 6073375,
+            "range": "± 174274",
             "unit": "ns/iter"
           }
         ]
